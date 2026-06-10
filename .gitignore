@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+data/audit/*.jsonl
+data/backtests/*.json
+coverage/
+.DS_Store
+.turbo/
+*.tsbuildinfo
+# never commit keys / wallet material
+*.key
+*.pem
+twak-config.json
