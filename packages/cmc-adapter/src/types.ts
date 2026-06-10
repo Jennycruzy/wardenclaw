@@ -1,13 +1,13 @@
 /**
  * CoinMarketCap Agent Hub adapter types.
  *
- * CMC is RUNECLAW BSC's perception layer ("its eyes"). Every signal records WHICH
+ * CMC is WARDENCLAW BSC's perception layer ("its eyes"). Every signal records WHICH
  * CMC tool produced it, the timestamp, and (when x402-paid) the receipt — that
  * per-mandate attribution is the evidence for the "Best Use of Agent Hub" prize.
  * Nothing here fabricates market data; the client fails loudly without a key.
  */
 
-/** The CMC Agent Hub tools RUNECLAW attributes decisions to. */
+/** The CMC Agent Hub tools WARDENCLAW attributes decisions to. */
 export type CmcTool =
   | "quotes"
   | "listings"

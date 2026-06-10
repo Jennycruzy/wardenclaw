@@ -8,7 +8,7 @@
  * agent run and the dashboards render against real addresses before it exists.
  */
 
-import type { EligibleToken } from "@runeclaw/core";
+import type { EligibleToken } from "@wardenclaw/core";
 
 /** PancakeSwap V2 router on BSC mainnet. */
 export const PANCAKE_V2_ROUTER = "0x10ed43c718714eb63d5aa57b78b54704e256024e";

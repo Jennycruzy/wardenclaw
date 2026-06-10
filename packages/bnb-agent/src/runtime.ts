@@ -24,7 +24,7 @@ export interface Alert {
 }
 
 export function formatAlert(alert: Alert): string {
-  const head = `[RUNECLAW] ${alert.reason.toUpperCase()} — ${alert.message}`;
+  const head = `[WARDENCLAW] ${alert.reason.toUpperCase()} — ${alert.message}`;
   return alert.data ? `${head}\n${JSON.stringify(alert.data)}` : head;
 }
 

@@ -10,8 +10,8 @@
  * refusal carries a deterministic reject code.
  */
 
-import { RejectCode, type SignalMandate } from "@runeclaw/core";
-import { assertLegsEligible, EligibleAllowlist } from "@runeclaw/core";
+import { RejectCode, type SignalMandate } from "@wardenclaw/core";
+import { assertLegsEligible, EligibleAllowlist } from "@wardenclaw/core";
 import type { TwakIntent } from "./types.js";
 
 /** TWAK-specific reject codes layered on top of the core set. */

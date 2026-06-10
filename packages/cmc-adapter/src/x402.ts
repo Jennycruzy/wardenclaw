@@ -16,7 +16,7 @@
 import { webcrypto } from "node:crypto";
 import { privateKeyToAccount } from "viem/accounts";
 import { type Account } from "viem";
-import type { X402Receipt } from "@runeclaw/twak-adapter";
+import type { X402Receipt } from "@wardenclaw/twak-adapter";
 
 /** USDC on Base — the x402 settlement asset (EIP-3009 domain). */
 export const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -91,7 +91,7 @@ export class CmcX402Client {
     if (!key) {
       throw new CmcX402Error(
         "X402_PRIVATE_KEY (a Base account with USDC) is required for x402 payments. " +
-          "RUNECLAW never fabricates an x402 receipt — it fails loudly without funds.",
+          "WARDENCLAW never fabricates an x402 receipt — it fails loudly without funds.",
       );
     }
     this.account = privateKeyToAccount(key as `0x${string}`);

@@ -1,5 +1,5 @@
 /**
- * Run the RUNECLAW BSC agent decision loop.
+ * Run the WARDENCLAW BSC agent decision loop.
  *
  * Modes:
  *   - With CMC_API_KEY: pulls REAL CMC perception, runs the full deterministic
@@ -25,22 +25,22 @@ import {
   buildCalibrationReport,
   loadRiskConfig,
   type CalibrationReport,
-} from "@runeclaw/core";
-import { CmcClient, buildMomentumInputs } from "@runeclaw/cmc-adapter";
+} from "@wardenclaw/core";
+import { CmcClient, buildMomentumInputs } from "@wardenclaw/cmc-adapter";
 import {
   loadEligibleTokens,
   LiveBscReader,
   NoPoolError,
   PANCAKE_V2_ROUTER,
   STARTER_MAJORS,
-} from "@runeclaw/bsc-adapter";
+} from "@wardenclaw/bsc-adapter";
 import {
   evaluateCandidate,
   buildBscMandate,
   type CandidateInput,
   type PipelineContext,
-} from "@runeclaw/bnb-agent";
-import type { TwakPolicyConfig } from "@runeclaw/twak-adapter";
+} from "@wardenclaw/bnb-agent";
+import type { TwakPolicyConfig } from "@wardenclaw/twak-adapter";
 
 const config = loadRiskConfig(process.env as Record<string, string | undefined>);
 
@@ -60,7 +60,7 @@ function seedCalibration(): CalibrationReport {
 async function main(): Promise<void> {
   if (!process.env.CMC_API_KEY) {
     console.error(
-      "✗ CMC_API_KEY is required for live perception. RUNECLAW never fabricates market data.\n" +
+      "✗ CMC_API_KEY is required for live perception. WARDENCLAW never fabricates market data.\n" +
         "  Set CMC_API_KEY in .env, then re-run. (Live signing also needs TWAK_CONFIG_PATH.)",
     );
     process.exit(1);

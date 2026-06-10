@@ -5,8 +5,8 @@ import { SignalFamilyChip, ExecutionStatusChip } from "@/components/chips";
 import { RejectionBars } from "@/components/charts";
 import { loadBscMandates, computeBscProof, readBscEnv } from "@/lib/data";
 import { num, timeAgo, shortTime } from "@/lib/format";
-import { DEFAULT_RISK_CONFIG } from "@runeclaw/core";
-import { STARTER_STABLES, STARTER_MAJORS } from "@runeclaw/bsc-adapter";
+import { DEFAULT_RISK_CONFIG } from "@wardenclaw/core";
+import { STARTER_STABLES, STARTER_MAJORS } from "@wardenclaw/bsc-adapter";
 
 export const dynamic = "force-dynamic";
 

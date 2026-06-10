@@ -1,4 +1,4 @@
-# RUNECLAW BSC — PnL-First Autonomous BSC Trading Agent
+# WARDENCLAW BSC — PnL-First Autonomous BSC Trading Agent
 
 A self-custodial, spot-only BSC trading agent for **Track 1** of the BNB Hack:
 AI Trading Agent Edition. It starts from **$40**, trades only the verified eligible
@@ -89,7 +89,7 @@ pnpm backtest:bsc                   # economics on the $40 book
 pnpm demo:twak-refusal              # TWAK refuses bad trades, live
 pnpm run:bsc-agent                  # dry decision run on real CMC data (no signing)
 pnpm rehearsal:checklist            # §0.12 gate → docs/PREFLIGHT.md
-pnpm --filter @runeclaw/web dev     # dashboards: /bsc, /bsc/proof, /bsc/ops
+pnpm --filter @wardenclaw/web dev     # dashboards: /bsc, /bsc/proof, /bsc/ops
 ```
 
 Live: configure TWAK + RPC + alerts, pass the rehearsal, then run under pm2

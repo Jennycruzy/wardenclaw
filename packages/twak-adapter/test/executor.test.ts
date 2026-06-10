@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { EligibleAllowlist } from "@runeclaw/core";
+import { EligibleAllowlist } from "@wardenclaw/core";
 import {
   UnconfiguredTwakExecutor,
   PolicyEnforcingExecutor,

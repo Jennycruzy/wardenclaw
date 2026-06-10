@@ -1,5 +1,5 @@
 /**
- * Bitget-side types for RUNECLAW Stocks — the xStock earnings/news reactor.
+ * Bitget-side types for WARDENCLAW Stocks — the xStock earnings/news reactor.
  *
  * Everything here is paper/sim by design (the only simulation allowance in the
  * system). Market data is real Bitget public data; execution is internal paper

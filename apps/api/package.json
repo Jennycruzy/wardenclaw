@@ -1,5 +1,5 @@
 {
-  "name": "@runeclaw/api",
+  "name": "@wardenclaw/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@runeclaw/bnb-agent": "workspace:*",
-    "@runeclaw/core": "workspace:*",
+    "@wardenclaw/bnb-agent": "workspace:*",
+    "@wardenclaw/core": "workspace:*",
     "dotenv": "^16.4.5",
     "fastify": "^5.1.0"
   },

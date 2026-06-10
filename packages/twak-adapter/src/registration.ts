@@ -8,7 +8,7 @@
  * a real registration requires a configured TWAK executor.
  */
 
-import { COMPETITION } from "@runeclaw/core";
+import { COMPETITION } from "@wardenclaw/core";
 import type { RegistrationResult } from "./types.js";
 import type { TwakExecutor } from "./executor.js";
 

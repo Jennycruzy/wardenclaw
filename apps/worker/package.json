@@ -1,5 +1,5 @@
 {
-  "name": "@runeclaw/worker",
+  "name": "@wardenclaw/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,11 +9,11 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@runeclaw/bnb-agent": "workspace:*",
-    "@runeclaw/bsc-adapter": "workspace:*",
-    "@runeclaw/cmc-adapter": "workspace:*",
-    "@runeclaw/core": "workspace:*",
-    "@runeclaw/twak-adapter": "workspace:*",
+    "@wardenclaw/bnb-agent": "workspace:*",
+    "@wardenclaw/bsc-adapter": "workspace:*",
+    "@wardenclaw/cmc-adapter": "workspace:*",
+    "@wardenclaw/core": "workspace:*",
+    "@wardenclaw/twak-adapter": "workspace:*",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {

@@ -1,11 +1,11 @@
 # Special Prizes — Evidence Mapped to the Verified Rubrics
 
-Three $2,000 special prizes, stackable with main placements. RUNECLAW BSC is
+Three $2,000 special prizes, stackable with main placements. WARDENCLAW BSC is
 engineered against each.
 
 ## Best Use of Trust Wallet Agent Kit (§0.1c rubric, by point band)
 
-| Rubric line (pts) | How RUNECLAW maxes it | Evidence |
+| Rubric line (pts) | How WARDENCLAW maxes it | Evidence |
 |---|---|---|
 | **Integration depth (30)** — sole executor, more than one surface | TWAK is the only signer and uses **three** surfaces: local signing, autonomous mode, and native x402. The strategy/risk logic is upstream; TWAK is structurally irreplaceable. | `packages/twak-adapter/*`, `PolicyEnforcingExecutor`, `payX402InLoop`, registration |
 | **Self-custody integrity (20–25)** — clean local signing, zero custodial components | The backend produces Signal Mandates only and **cannot move funds**; no DB-stored keys; the key stays local with TWAK. | `apps/api` (no signer), `apps/worker` (no signer), `docs/SAFETY.md` |

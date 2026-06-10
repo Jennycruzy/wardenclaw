@@ -25,9 +25,9 @@ import {
   type EligibleAllowlist,
   type RiskConfig,
   type SignalFamily,
-} from "@runeclaw/core";
-import { expectedSlippageBps } from "@runeclaw/bsc-adapter";
-import { evaluateTwakPolicy, type TwakIntent, type TwakPolicyConfig } from "@runeclaw/twak-adapter";
+} from "@wardenclaw/core";
+import { expectedSlippageBps } from "@wardenclaw/bsc-adapter";
+import { evaluateTwakPolicy, type TwakIntent, type TwakPolicyConfig } from "@wardenclaw/twak-adapter";
 
 export interface CandidateInput {
   symbol: string;

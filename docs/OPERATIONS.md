@@ -6,15 +6,15 @@ as bad trades — a crashed agent also misses the verified 1-trade/day minimum.
 ## Processes
 
 Two processes under pm2 (`ops/pm2.config.cjs`):
-- **runeclaw-worker** — the trading loop (perception → gates → execute → snapshot).
-- **runeclaw-api** — the phone-reachable control surface (health + kill-switch).
+- **wardenclaw-worker** — the trading loop (perception → gates → execute → snapshot).
+- **wardenclaw-api** — the phone-reachable control surface (health + kill-switch).
 
 ```bash
 pnpm install
 pm2 start ops/pm2.config.cjs
 pm2 save && pm2 startup      # start on reboot
-pm2 logs runeclaw-worker     # follow the loop
-pm2 restart runeclaw-worker  # manual restart (recovery runs automatically)
+pm2 logs wardenclaw-worker     # follow the loop
+pm2 restart wardenclaw-worker  # manual restart (recovery runs automatically)
 ```
 
 Both auto-restart with backoff. On every start the worker runs **crash-recovery

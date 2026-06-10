@@ -1,5 +1,5 @@
 {
-  "name": "@runeclaw/bnb-agent",
+  "name": "@wardenclaw/bnb-agent",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,10 +15,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@runeclaw/bsc-adapter": "workspace:*",
-    "@runeclaw/cmc-adapter": "workspace:*",
-    "@runeclaw/core": "workspace:*",
-    "@runeclaw/twak-adapter": "workspace:*",
+    "@wardenclaw/bsc-adapter": "workspace:*",
+    "@wardenclaw/cmc-adapter": "workspace:*",
+    "@wardenclaw/core": "workspace:*",
+    "@wardenclaw/twak-adapter": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {

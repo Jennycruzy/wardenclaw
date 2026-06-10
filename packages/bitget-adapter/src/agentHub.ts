@@ -36,7 +36,7 @@ export interface AgentHubSource {
 const NOT_VERIFIED =
   "Bitget Agent Hub is not configured/verified. Set BITGET_AGENT_HUB_BASE_URL " +
   "and verify the official tool names, or supply a real news/sentiment source. " +
-  "RUNECLAW will not fabricate news, sentiment, or macro data.";
+  "WARDENCLAW will not fabricate news, sentiment, or macro data.";
 
 /** The default, intentionally-unavailable Agent Hub. Every call fails loudly. */
 export class UnverifiedAgentHub implements AgentHubSource {

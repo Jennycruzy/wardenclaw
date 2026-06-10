@@ -30,7 +30,7 @@ pnpm verify:integrations
 ```bash
 pnpm backtest:bitget                # report → data/backtests/ (shown on the dashboard)
 pnpm run:bitget-paper               # paper-trade real Bitget public data
-pnpm --filter @runeclaw/web dev     # http://localhost:3000/bitget
+pnpm --filter @wardenclaw/web dev     # http://localhost:3000/bitget
 ```
 
 Execution is always labeled (`internal_paper_engine`); fills are simulated on real
@@ -44,7 +44,7 @@ pnpm calibrate:edge                 # tune score→expected-move on real history
 pnpm backtest:bsc                   # economics on the $40 book
 pnpm demo:twak-refusal              # TWAK refuses bad trades (no funds move)
 pnpm run:bsc-agent                  # dry decision run on real CMC data (no signing)
-pnpm --filter @runeclaw/web dev     # http://localhost:3000/bsc and /bsc/proof
+pnpm --filter @wardenclaw/web dev     # http://localhost:3000/bsc and /bsc/proof
 ```
 
 ### Going live (during the competition week)

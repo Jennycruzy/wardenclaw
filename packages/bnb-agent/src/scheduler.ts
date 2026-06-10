@@ -7,7 +7,7 @@
  * directional trade is never forced just to satisfy activity.
  */
 
-import type { RiskConfig } from "@runeclaw/core";
+import type { RiskConfig } from "@wardenclaw/core";
 
 export interface ScheduleState {
   tradesToday: number;

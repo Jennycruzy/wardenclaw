@@ -1,7 +1,7 @@
 /**
  * Trust Wallet Agent Kit (TWAK) adapter types.
  *
- * TWAK is the SOLE execution layer for RUNECLAW BSC: local signing, autonomous
+ * TWAK is the SOLE execution layer for WARDENCLAW BSC: local signing, autonomous
  * spot execution, x402 payment, and competition registration. Self-custody is
  * absolute — the private key stays local with TWAK, the backend never signs, and
  * no key is ever stored in a DB. This module models the intents TWAK acts on and

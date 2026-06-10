@@ -6,7 +6,7 @@ import {
   AuditLogger,
   verifyChain,
   parseMandate,
-} from "@runeclaw/core";
+} from "@wardenclaw/core";
 import {
   BitgetReactorAgent,
   PaperBook,
@@ -20,7 +20,7 @@ import { shockSeries, appendCalm } from "./helpers.js";
 const armedUp: ShockDetection = { isShock: true, magnitudePct: 0.06, volumeRatio: 3, direction: "up" };
 
 function makeAgent() {
-  const dir = mkdtempSync(join(tmpdir(), "runeclaw-bitget-"));
+  const dir = mkdtempSync(join(tmpdir(), "wardenclaw-bitget-"));
   const auditPath = join(dir, "audit.jsonl");
   const book = new PaperBook(10_000);
   const audit = new AuditLogger(auditPath);

@@ -1,5 +1,5 @@
 {
-  "name": "@runeclaw/bitget-adapter",
+  "name": "@wardenclaw/bitget-adapter",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@runeclaw/core": "workspace:*",
+    "@wardenclaw/core": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {

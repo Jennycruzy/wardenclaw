@@ -1,11 +1,11 @@
-# RUNECLAW Stocks — xStock Earnings/News Reactor (Bitget)
+# WARDENCLAW Stocks — xStock Earnings/News Reactor (Bitget)
 
 A Bitget-native paper-trading agent that monitors tokenized US equities, reacts
 to earnings/news/sentiment shocks **without chasing the first spike**, paper-trades
 through deterministic configurable risk gates, and gives judges a replayable
 audit trail.
 
-> Because tokenized equities can be monitored continuously, RUNECLAW reacts to
+> Because tokenized equities can be monitored continuously, WARDENCLAW reacts to
 > after-hours earnings/news/sentiment shocks faster than a human — but is
 > disciplined enough not to buy the first fake spike.
 
@@ -76,7 +76,7 @@ pnpm backtest:bitget -- NVDAXUSDT
 pnpm backtest:bitget            # synthetic shock-and-run series
 
 # Judge dashboard
-pnpm --filter @runeclaw/web dev   # http://localhost:3000/bitget
+pnpm --filter @wardenclaw/web dev   # http://localhost:3000/bitget
 ```
 
 Audit trails (events + full mandates) are written to `data/audit/`; backtest

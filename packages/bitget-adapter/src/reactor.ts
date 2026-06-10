@@ -13,7 +13,7 @@
  * execution, and audit live in the agent layer.
  */
 
-import { scoreBitget, type BitgetScoreInputs } from "@runeclaw/core";
+import { scoreBitget, type BitgetScoreInputs } from "@wardenclaw/core";
 import type { BitgetCandle } from "./types.js";
 import { BitgetRejectCode } from "./types.js";
 

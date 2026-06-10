@@ -8,7 +8,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { replayMandate, type AuditEvent } from "@runeclaw/core";
+import { replayMandate, type AuditEvent } from "@wardenclaw/core";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);

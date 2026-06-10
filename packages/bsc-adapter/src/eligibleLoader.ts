@@ -8,7 +8,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { EligibleAllowlist, type EligibleToken } from "@runeclaw/core";
+import { EligibleAllowlist, type EligibleToken } from "@wardenclaw/core";
 import { STARTER_TOKENS } from "./knownTokens.js";
 
 export interface LoadedAllowlist {

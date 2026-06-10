@@ -1,5 +1,5 @@
 /**
- * Run the RUNECLAW Stocks reactor in paper mode against REAL Bitget public
+ * Run the WARDENCLAW Stocks reactor in paper mode against REAL Bitget public
  * market data. This pulls live candles/tickers for the xStock universe, tracks
  * shock/cooldown state across polling cycles, and paper-trades the confirmed
  * continuation through the internal paper engine.
@@ -21,7 +21,7 @@ import "dotenv/config";
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AuditLogger, appendMandate } from "@runeclaw/core";
+import { AuditLogger, appendMandate } from "@wardenclaw/core";
 import {
   BitgetPublicMarketData,
   BitgetReactorAgent,
@@ -36,7 +36,7 @@ import {
   type AssetPerception,
   type ShockDetection,
   type BitgetAgentConfig,
-} from "@runeclaw/bitget-adapter";
+} from "@wardenclaw/bitget-adapter";
 
 const granularity = process.env.BITGET_CANDLE_GRANULARITY ?? "5min";
 const pollSeconds = Number(process.env.BITGET_POLL_SECONDS ?? "60");

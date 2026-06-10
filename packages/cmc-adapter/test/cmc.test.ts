@@ -8,7 +8,7 @@ import {
   buildAttribution,
   type FetchLike,
 } from "../src/index.js";
-import { scoreBsc } from "@runeclaw/core";
+import { scoreBsc } from "@wardenclaw/core";
 
 function stub(body: unknown, ok = true, status = 200): FetchLike {
   return async () => ({ ok, status, json: async () => body });

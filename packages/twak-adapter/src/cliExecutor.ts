@@ -18,7 +18,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { EligibleAllowlist, type EligibleToken } from "@runeclaw/core";
+import { EligibleAllowlist, type EligibleToken } from "@wardenclaw/core";
 import type { RegistrationResult, TwakIntent, TwakReceipt, X402Receipt } from "./types.js";
 import type { TwakExecutor } from "./executor.js";
 

@@ -5,8 +5,8 @@ import {
   parseMandate,
   type BscScoreInputs,
   type CalibrationReport,
-} from "@runeclaw/core";
-import type { TwakPolicyConfig } from "@runeclaw/twak-adapter";
+} from "@wardenclaw/core";
+import type { TwakPolicyConfig } from "@wardenclaw/twak-adapter";
 import { evaluateCandidate, buildBscMandate, type CandidateInput, type PipelineContext } from "../src/index.js";
 
 const USDT = "0x55d398326f99059ff775485246999027b3197955";

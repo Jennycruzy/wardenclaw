@@ -7,7 +7,7 @@
  * tools it consumed so the mandate can attribute its decision.
  */
 
-import type { BscScoreInputs } from "@runeclaw/core";
+import type { BscScoreInputs } from "@wardenclaw/core";
 import type { CmcQuote, CmcSignal, FearGreed, TrendingToken } from "./types.js";
 
 function clamp01(x: number): number {

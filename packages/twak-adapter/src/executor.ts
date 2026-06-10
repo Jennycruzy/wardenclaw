@@ -9,7 +9,7 @@
  * the refusal happens before signing, so a bad intent never reaches the key.
  */
 
-import { EligibleAllowlist } from "@runeclaw/core";
+import { EligibleAllowlist } from "@wardenclaw/core";
 import type { RegistrationResult, TwakIntent, TwakReceipt, X402Receipt } from "./types.js";
 import {
   evaluateTwakPolicy,
@@ -33,7 +33,7 @@ export interface TwakExecutor {
 
 const NOT_CONFIGURED =
   "TWAK is not configured. Set TWAK_CONFIG_PATH/TWAK_AGENT_WALLET and provide a real " +
-  "Trust Wallet Agent Kit binding. RUNECLAW never fakes signatures, tx hashes, or " +
+  "Trust Wallet Agent Kit binding. WARDENCLAW never fakes signatures, tx hashes, or " +
   "receipts — execution fails loudly until TWAK is wired.";
 
 /** The default executor: every call fails loudly. Self-custody, no fakes. */

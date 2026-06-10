@@ -9,7 +9,7 @@ import {
   readDashboardEnv,
 } from "@/lib/data";
 import { num, timeAgo, shortTime } from "@/lib/format";
-import { TRADEABLE_XSTOCKS, INDEX_PROXIES } from "@runeclaw/bitget-adapter";
+import { TRADEABLE_XSTOCKS, INDEX_PROXIES } from "@wardenclaw/bitget-adapter";
 
 export const dynamic = "force-dynamic";
 

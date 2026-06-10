@@ -4,7 +4,7 @@
  * Exits non-zero only when a verified rule is missing an implementation.
  */
 
-import { verifyCompetitionRules } from "@runeclaw/core";
+import { verifyCompetitionRules } from "@wardenclaw/core";
 
 function main(): void {
   const result = verifyCompetitionRules();

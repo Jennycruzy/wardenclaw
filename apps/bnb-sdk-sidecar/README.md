@@ -4,7 +4,7 @@ The official BNB AI Agent SDK (`bnbagent`) is **Python**, so this narrow sidecar
 is the only Python in the project. It registers the agent's on-chain identity
 (ERC-8004) and **owns no strategy, scoring, risk, or execution logic** — the
 TypeScript core stays the single source of truth. The worker calls it through the
-`registerAgentIdentity()` bridge in `@runeclaw/bnb-agent`.
+`registerAgentIdentity()` bridge in `@wardenclaw/bnb-agent`.
 
 ## Setup
 

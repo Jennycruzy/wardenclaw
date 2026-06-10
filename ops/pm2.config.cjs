@@ -1,5 +1,5 @@
 /**
- * pm2 process manager config for the RUNECLAW BSC live window (§0.11).
+ * pm2 process manager config for the WARDENCLAW BSC live window (§0.11).
  *
  * Both processes auto-restart with backoff and start on reboot (`pm2 startup` +
  * `pm2 save`). The worker is the trading loop; the API is the phone-reachable
@@ -8,16 +8,16 @@
  *   pnpm install
  *   pm2 start ops/pm2.config.cjs
  *   pm2 save && pm2 startup
- *   pm2 logs runeclaw-worker
+ *   pm2 logs wardenclaw-worker
  */
 
 module.exports = {
   apps: [
     {
-      name: "runeclaw-worker",
+      name: "wardenclaw-worker",
       cwd: __dirname + "/..",
       script: "pnpm",
-      args: "--filter @runeclaw/worker start",
+      args: "--filter @wardenclaw/worker start",
       autorestart: true,
       max_restarts: 50,
       restart_delay: 5000,
@@ -26,10 +26,10 @@ module.exports = {
       env: { NODE_ENV: "production" },
     },
     {
-      name: "runeclaw-api",
+      name: "wardenclaw-api",
       cwd: __dirname + "/..",
       script: "pnpm",
-      args: "--filter @runeclaw/api start",
+      args: "--filter @wardenclaw/api start",
       autorestart: true,
       max_restarts: 50,
       restart_delay: 3000,

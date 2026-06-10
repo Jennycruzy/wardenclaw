@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   // Transpile the workspace TS packages (they ship raw .ts via the "main" field).
-  transpilePackages: ["@runeclaw/core", "@runeclaw/bitget-adapter", "@runeclaw/bsc-adapter"],
+  transpilePackages: ["@wardenclaw/core", "@wardenclaw/bitget-adapter", "@wardenclaw/bsc-adapter"],
   experimental: {
     // The dashboard reads audit/backtest files from the monorepo data/ dir.
     outputFileTracingRoot: undefined,

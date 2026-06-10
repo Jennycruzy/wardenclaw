@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RUNECLAW — BNB AI Agent SDK sidecar.
+"""WARDENCLAW — BNB AI Agent SDK sidecar.
 
 Registers the agent's on-chain identity (ERC-8004) via the official `bnbagent`
 SDK. This sidecar owns NO strategy, scoring, risk, mandate, or execution logic —
@@ -14,7 +14,7 @@ Env:
   BNB_AGENT_WALLET_PASSWORD   (required) wallet keystore password
   BNB_AGENT_PRIVATE_KEY       (first run only) 0x-prefixed key
   BNB_SDK_NETWORK             default "bsc" (use "bsc-testnet" for gas-free rehearsal)
-  BNB_AGENT_NAME              default "runeclaw-bsc"
+  BNB_AGENT_NAME              default "wardenclaw-bsc"
   BNB_AGENT_ENDPOINT          ERC-8183 status endpoint URL
 """
 import json
@@ -47,12 +47,12 @@ def main() -> None:
     sdk = ERC8004Agent(network=network, wallet_provider=wallet)
 
     agent_uri = sdk.generate_agent_uri(
-        name=os.getenv("BNB_AGENT_NAME", "runeclaw-bsc"),
-        description="RUNECLAW BSC — spot-only, calibrated-edge trading agent",
+        name=os.getenv("BNB_AGENT_NAME", "wardenclaw-bsc"),
+        description="WARDENCLAW BSC — spot-only, calibrated-edge trading agent",
         endpoints=[
             AgentEndpoint(
                 name="ERC-8183",
-                endpoint=os.getenv("BNB_AGENT_ENDPOINT", "https://runeclaw.local/erc8183/status"),
+                endpoint=os.getenv("BNB_AGENT_ENDPOINT", "https://wardenclaw.local/erc8183/status"),
                 version="0.1.0",
             ),
         ],

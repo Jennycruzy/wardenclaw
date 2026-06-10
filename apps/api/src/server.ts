@@ -1,5 +1,5 @@
 /**
- * RUNECLAW BSC control API (Fastify, TypeScript).
+ * WARDENCLAW BSC control API (Fastify, TypeScript).
  *
  * Exposes the operational surface the user reaches from a phone (§0.11):
  *   GET  /health        — liveness + heartbeat freshness + kill state
@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { config as loadDotenv } from "dotenv";
 import Fastify from "fastify";
-import { KillSwitch, sendAlert } from "@runeclaw/bnb-agent";
+import { KillSwitch, sendAlert } from "@wardenclaw/bnb-agent";
 import { readHeartbeat, writeKillFlag, readKillFlag } from "./state.js";
 
 // Load the monorepo-root .env regardless of the process cwd (pnpm runs the
@@ -93,7 +93,7 @@ app.post("/alert/test", async (req, reply) => {
   }
   const result = await sendAlert(process.env.ALERT_WEBHOOK_URL, {
     reason: "daily_trade_at_risk",
-    message: "Test alert from RUNECLAW API.",
+    message: "Test alert from WARDENCLAW API.",
     timestamp: new Date().toISOString(),
   });
   return reply.send({ ok: true, delivery: result });
@@ -101,7 +101,7 @@ app.post("/alert/test", async (req, reply) => {
 
 app
   .listen({ port: PORT, host: "0.0.0.0" })
-  .then(() => app.log.info(`RUNECLAW API listening on :${PORT}`))
+  .then(() => app.log.info(`WARDENCLAW API listening on :${PORT}`))
   .catch((err) => {
     app.log.error(err);
     process.exit(1);

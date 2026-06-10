@@ -10,7 +10,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runBacktest, loadRiskConfig, type Bar } from "@runeclaw/core";
+import { runBacktest, loadRiskConfig, type Bar } from "@wardenclaw/core";
 
 const config = loadRiskConfig(process.env as Record<string, string | undefined>);
 

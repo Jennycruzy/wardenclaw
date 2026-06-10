@@ -1,5 +1,5 @@
 /**
- * Shared RUNECLAW types. The SignalMandate is the system's central primitive:
+ * Shared WARDENCLAW types. The SignalMandate is the system's central primitive:
  * every trade is a structured, replayable object carrying perception, decision,
  * economics, risk, execution, watchdog actions, result and proof.
  */

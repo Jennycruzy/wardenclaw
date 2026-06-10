@@ -122,6 +122,6 @@ registration with those in place. See `docs/DEPLOYMENT.md`.
 ## Gate
 
 `pnpm install && pnpm typecheck && pnpm lint && pnpm test` is green (**208 tests**,
-including a live BSC-mainnet read); `pnpm --filter @runeclaw/web build` is green. No
+including a live BSC-mainnet read); `pnpm --filter @wardenclaw/web build` is green. No
 silent gaps; every integration is real code, verified from official docs and tested,
 and fails loud without credentials.

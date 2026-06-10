@@ -1,11 +1,11 @@
-# RUNECLAW
+# WARDENCLAW
 
-> RUNECLAW turns natural-language trading strategies into risk-bound Signal Mandates that can trade, survive, and prove why they acted.
+> WARDENCLAW turns natural-language trading strategies into risk-bound Signal Mandates that can trade, survive, and prove why they acted.
 
 One shared deterministic core, two focused submissions:
 
-- **RUNECLAW Stocks** — a Bitget-native paper-trading agent that reacts to tokenized-equity earnings/news/sentiment shocks under deterministic risk gates.
-- **RUNECLAW BSC** — a live, self-custodial, spot-only BSC trading agent that reads markets via CoinMarketCap, signs through Trust Wallet Agent Kit, and optimizes total return under a drawdown cap from a $40 book.
+- **WARDENCLAW Stocks** — a Bitget-native paper-trading agent that reacts to tokenized-equity earnings/news/sentiment shocks under deterministic risk gates.
+- **WARDENCLAW BSC** — a live, self-custodial, spot-only BSC trading agent that reads markets via CoinMarketCap, signs through Trust Wallet Agent Kit, and optimizes total return under a drawdown cap from a $40 book.
 
 ## Status
 
@@ -40,7 +40,7 @@ SAFETY,LLM_POLICY,ECONOMICS,OPERATIONS,PREFLIGHT,SELF_AUDIT}.md`. Start with
 pnpm install
 pnpm typecheck && pnpm lint && pnpm test
 pnpm demo:twak-refusal              # see TWAK refuse bad trades
-pnpm --filter @runeclaw/web dev     # dashboards on http://localhost:3000
+pnpm --filter @wardenclaw/web dev     # dashboards on http://localhost:3000
 ```
 
 ## Safety

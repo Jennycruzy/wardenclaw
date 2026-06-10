@@ -14,7 +14,7 @@ import {
   type AuditEvent,
   type MandateReplay,
   type SignalMandate,
-} from "@runeclaw/core";
+} from "@wardenclaw/core";
 
 /** Walk up from cwd to find the monorepo root (where pnpm-workspace.yaml lives). */
 function findRepoRoot(): string {

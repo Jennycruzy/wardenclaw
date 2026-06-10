@@ -33,7 +33,7 @@ export interface QuoteProvider {
 
 const NOT_CONFIGURED =
   "BSC quote provider not configured. Provide a real RPC-backed PancakeSwap quoter " +
-  "(BSC_RPC_URLS). RUNECLAW never fabricates a quote — reads fail loudly.";
+  "(BSC_RPC_URLS). WARDENCLAW never fabricates a quote — reads fail loudly.";
 
 export class UnconfiguredQuoteProvider implements QuoteProvider {
   readonly configured = false;

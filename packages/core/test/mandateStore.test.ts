@@ -37,7 +37,7 @@ function sampleMandate(id: string): SignalMandate {
 
 describe("mandateStore", () => {
   it("round-trips mandates and validates on read", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "runeclaw-store-"));
+    const dir = mkdtempSync(join(tmpdir(), "wardenclaw-store-"));
     const path = join(dir, "mandates.jsonl");
     try {
       await appendMandate(path, sampleMandate("a"));
@@ -54,7 +54,7 @@ describe("mandateStore", () => {
   });
 
   it("refuses to persist a malformed mandate", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "runeclaw-store-"));
+    const dir = mkdtempSync(join(tmpdir(), "wardenclaw-store-"));
     const path = join(dir, "m.jsonl");
     try {
       // @ts-expect-error intentionally malformed

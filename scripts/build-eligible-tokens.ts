@@ -9,7 +9,7 @@
 import "dotenv/config";
 
 import { writeFile } from "node:fs/promises";
-import { ENUMERATED_ELIGIBLE_SYMBOLS, type EligibleToken } from "@runeclaw/core";
+import { ENUMERATED_ELIGIBLE_SYMBOLS, type EligibleToken } from "@wardenclaw/core";
 
 const STABLE_SYMBOLS = new Set([
   "USDT", "USDC", "FDUSD", "DAI", "TUSD", "FRAX", "USD1", "USDe", "USDD",

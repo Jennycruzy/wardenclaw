@@ -13,7 +13,7 @@
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { verifyCompetitionRules } from "@runeclaw/core";
+import { verifyCompetitionRules } from "@wardenclaw/core";
 
 interface Check {
   id: number;

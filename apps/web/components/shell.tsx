@@ -41,7 +41,7 @@ export function Shell({
               R
             </span>
             <span className="text-sm font-semibold tracking-tight">
-              RUNECLAW <span className="text-ink-muted">{brand}</span>
+              WARDENCLAW <span className="text-ink-muted">{brand}</span>
             </span>
           </Link>
           <nav className="flex items-center gap-1 text-sm">

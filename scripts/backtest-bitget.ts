@@ -1,5 +1,5 @@
 /**
- * Backtest the RUNECLAW Stocks reactor over real Bitget historical candles and
+ * Backtest the WARDENCLAW Stocks reactor over real Bitget historical candles and
  * write a PnL/drawdown report to data/backtests/. Runs the same shock/cooldown
  * and net-edge logic the live paper agent uses.
  *
@@ -15,7 +15,7 @@ import {
   BitgetPublicMarketData,
   backtestReactor,
   type BitgetCandle,
-} from "@runeclaw/bitget-adapter";
+} from "@wardenclaw/bitget-adapter";
 
 function syntheticSeries(): BitgetCandle[] {
   const bars: BitgetCandle[] = [];

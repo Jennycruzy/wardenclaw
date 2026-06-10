@@ -1,5 +1,5 @@
 /**
- * RUNECLAW BSC worker — the autonomous loop that runs unattended during the live
+ * WARDENCLAW BSC worker — the autonomous loop that runs unattended during the live
  * window (§0.11). Responsibilities:
  *   1. Crash-recovery reconciliation BEFORE any new trade (no duplicate trades).
  *   2. Per-cycle: honor the kill-switch, refresh CMC perception, run the gate
@@ -10,7 +10,7 @@
  * a configured TWAK executor; without it the worker runs the full ops loop in DRY
  * decision mode (no signing) and says so. It never fakes a fill or a tx hash.
  *
- *   pnpm --filter @runeclaw/worker start
+ *   pnpm --filter @wardenclaw/worker start
  *
  * Env: WORKER_INTERVAL_SECONDS (default 300), WORKER_MAX_CYCLES (default 0 = forever).
  */
@@ -28,27 +28,27 @@ import {
   type CalibrationReport,
   type PendingMandate,
   type Holding,
-} from "@runeclaw/core";
-import { CmcClient, CmcX402Client, buildMomentumInputs } from "@runeclaw/cmc-adapter";
+} from "@wardenclaw/core";
+import { CmcClient, CmcX402Client, buildMomentumInputs } from "@wardenclaw/cmc-adapter";
 import {
   loadEligibleTokens,
   LiveBscReader,
   NoPoolError,
   PANCAKE_V2_ROUTER,
   STARTER_MAJORS,
-} from "@runeclaw/bsc-adapter";
+} from "@wardenclaw/bsc-adapter";
 import {
   evaluateCandidate,
   buildBscMandate,
   sendAlert,
   registerAgentIdentity,
   type PipelineContext,
-} from "@runeclaw/bnb-agent";
+} from "@wardenclaw/bnb-agent";
 import {
   CliTwakExecutor,
   PolicyEnforcingExecutor,
   type TwakPolicyConfig,
-} from "@runeclaw/twak-adapter";
+} from "@wardenclaw/twak-adapter";
 
 function repoRoot(): string {
   let dir = process.cwd();

@@ -1,5 +1,5 @@
 {
-  "name": "@runeclaw/bsc-adapter",
+  "name": "@wardenclaw/bsc-adapter",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@runeclaw/core": "workspace:*",
+    "@wardenclaw/core": "workspace:*",
     "viem": "^2.52.2",
     "zod": "^3.23.8"
   },

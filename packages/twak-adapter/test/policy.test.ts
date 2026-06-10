@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EligibleAllowlist, RejectCode } from "@runeclaw/core";
+import { EligibleAllowlist, RejectCode } from "@wardenclaw/core";
 import {
   evaluateTwakPolicy,
   TwakRejectCode,

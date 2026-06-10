@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "RUNECLAW Stocks — xStock Reactor",
+  title: "WARDENCLAW Stocks — xStock Reactor",
   description: "Bitget-native xStock earnings/news reactor with a replayable audit trail.",
 };
 

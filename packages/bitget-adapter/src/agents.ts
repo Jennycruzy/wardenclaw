@@ -19,7 +19,7 @@ import {
   parseMandate,
   type SignalMandate,
   type MandateMode,
-} from "@runeclaw/core";
+} from "@wardenclaw/core";
 import type { BitgetCandle, BitgetExecutionMode } from "./types.js";
 import {
   evaluateReactor,

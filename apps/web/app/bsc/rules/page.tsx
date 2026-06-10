@@ -1,6 +1,6 @@
 import { BscShell } from "@/components/bscShell";
 import { Card, SectionTitle, Badge, Dot } from "@/components/ui";
-import { COMPETITION_RULES, verifyCompetitionRules } from "@runeclaw/core";
+import { COMPETITION_RULES, verifyCompetitionRules } from "@wardenclaw/core";
 
 export const dynamic = "force-dynamic";
 

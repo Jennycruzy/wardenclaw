@@ -5,7 +5,7 @@
  * on the Bitget side (no real gas), but the net-edge filter still runs.
  */
 
-import { runBacktest, type Bar, type BacktestResult, type SignalFn } from "@runeclaw/core";
+import { runBacktest, type Bar, type BacktestResult, type SignalFn } from "@wardenclaw/core";
 import type { BitgetCandle } from "./types.js";
 import { detectShock, DEFAULT_REACTOR_CONFIG, type ReactorConfig } from "./reactor.js";
 

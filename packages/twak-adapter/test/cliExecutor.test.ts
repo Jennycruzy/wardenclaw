@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CliTwakExecutor, TwakCliError, type TwakIntent } from "../src/index.js";
-import type { EligibleToken } from "@runeclaw/core";
+import type { EligibleToken } from "@wardenclaw/core";
 
 const USDT = "0x55d398326f99059ff775485246999027b3197955";
 const CAKE = "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82";

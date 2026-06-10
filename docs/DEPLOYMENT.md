@@ -1,6 +1,6 @@
 # Deployment & Credentials (VPS, 24/7)
 
-Everything you must obtain and set up to run RUNECLAW BSC live on a server. Do the
+Everything you must obtain and set up to run WARDENCLAW BSC live on a server. Do the
 setup as a **non-root sudo user**, not as `root`, and use SSH keys (disable
 password login). **Rotate any password you have shared in plaintext.**
 
@@ -31,7 +31,7 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 sudo npm i -g pnpm pm2 @trustwallet/cli
 
-git clone <your-repo-url> runeclaw && cd runeclaw
+git clone <your-repo-url> wardenclaw && cd wardenclaw
 pnpm install
 cp .env.example .env        # fill in the table above
 ```
@@ -75,7 +75,7 @@ gas**. Fund the Base x402 wallet with a few USDC.
 ```bash
 pm2 start ops/pm2.config.cjs
 pm2 save && pm2 startup        # follow the printed command
-pm2 logs runeclaw-worker
+pm2 logs wardenclaw-worker
 ```
 
 The worker refuses live mode unless the rehearsal gate passed (override only after

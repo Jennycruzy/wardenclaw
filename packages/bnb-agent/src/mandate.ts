@@ -5,7 +5,7 @@
  * TWAK receipt, x402 receipt, and BSC tx hash filled in at execution time.
  */
 
-import { parseMandate, type MandateMode, type SignalMandate } from "@runeclaw/core";
+import { parseMandate, type MandateMode, type SignalMandate } from "@wardenclaw/core";
 import type { PipelineResult } from "./pipeline.js";
 
 export interface MandateBuildInput {

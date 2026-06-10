@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_RISK_CONFIG } from "@runeclaw/core";
+import { DEFAULT_RISK_CONFIG } from "@wardenclaw/core";
 import { decideTradePlan, type ScheduleState } from "../src/index.js";
 
 const cfg = DEFAULT_RISK_CONFIG;

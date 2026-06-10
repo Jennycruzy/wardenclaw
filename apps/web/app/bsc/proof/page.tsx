@@ -9,8 +9,8 @@ import {
   loadHourlySnapshots,
   readBscEnv,
 } from "@/lib/data";
-import { DEFAULT_RISK_CONFIG } from "@runeclaw/core";
-import { totalReturnPct, maxDrawdownPct, type HourlySnapshot } from "@runeclaw/core";
+import { DEFAULT_RISK_CONFIG } from "@wardenclaw/core";
+import { totalReturnPct, maxDrawdownPct, type HourlySnapshot } from "@wardenclaw/core";
 import { usd, pct, num, shortTime, signClass } from "@/lib/format";
 
 export const dynamic = "force-dynamic";

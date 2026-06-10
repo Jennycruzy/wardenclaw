@@ -10,7 +10,7 @@
 import "dotenv/config";
 
 import { readFile, writeFile } from "node:fs/promises";
-import { buildCalibrationReport, type CalibrationSample } from "@runeclaw/core";
+import { buildCalibrationReport, type CalibrationSample } from "@wardenclaw/core";
 
 const SAMPLES_PATH = process.env.CALIBRATION_SAMPLES_PATH ?? "data/calibration/samples.json";
 const REPORT_PATH = process.env.CALIBRATION_REPORT_PATH ?? "data/calibration/report.json";

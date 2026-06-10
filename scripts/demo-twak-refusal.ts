@@ -12,14 +12,14 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AuditLogger, EligibleAllowlist } from "@runeclaw/core";
+import { AuditLogger, EligibleAllowlist } from "@wardenclaw/core";
 import {
   PolicyEnforcingExecutor,
   UnconfiguredTwakExecutor,
   type TwakIntent,
   type TwakPolicyConfig,
-} from "@runeclaw/twak-adapter";
-import { STARTER_TOKENS, PANCAKE_V2_ROUTER } from "@runeclaw/bsc-adapter";
+} from "@wardenclaw/twak-adapter";
+import { STARTER_TOKENS, PANCAKE_V2_ROUTER } from "@wardenclaw/bsc-adapter";
 
 const USDT = STARTER_TOKENS.find((t) => t.symbol === "USDT")!.bscContractAddress;
 const CAKE = STARTER_TOKENS.find((t) => t.symbol === "CAKE")!.bscContractAddress;

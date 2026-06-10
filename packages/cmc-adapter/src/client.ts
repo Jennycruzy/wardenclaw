@@ -41,7 +41,7 @@ export class CmcClient {
     const key = opts.apiKey ?? process.env.CMC_API_KEY;
     if (!key) {
       throw new CmcApiError(
-        "CMC_API_KEY is required. RUNECLAW never fabricates market data — perception fails loudly without a key.",
+        "CMC_API_KEY is required. WARDENCLAW never fabricates market data — perception fails loudly without a key.",
       );
     }
     this.apiKey = key;
