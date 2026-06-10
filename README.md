@@ -9,31 +9,38 @@ One shared deterministic core, two focused submissions:
 
 ## Status
 
-Build in progress. The shared TypeScript core is implemented and tested first, as the source of truth for the frontend, backend, and worker. External integrations (Bitget Agent Hub, CMC Agent Hub + x402, Trust Wallet Agent Kit, BNB AI Agent SDK, PancakeSwap) are real adapters that fail loudly when unconfigured — never faked.
+Both submissions are built. The shared TypeScript core is the source of truth for
+the frontend, backend, and worker. External integrations (Bitget public data, CMC
+Agent Hub + x402, Trust Wallet Agent Kit, BNB AI Agent SDK, PancakeSwap) are real
+adapters that fail loudly when unconfigured — never faked. ~190 tests pass;
+`typecheck`, `lint`, and the Next.js build are green.
 
 ### What's implemented
 
-`packages/core` — the deterministic engine, fully unit-tested:
+- **`packages/core`** — the deterministic engine: Signal Mandate schema, risk
+  config, friction model (real + simulated), net-edge gate, volatility stops +
+  coherence, three-layer drawdown governor, shadow-fill guard, calibration mapping,
+  address-keyed eligible allowlist, scorer, Risk Constitution, hash-chained audit,
+  replay, recovery, hourly snapshots, mandate store, LLM provider layer.
+- **Bitget submission** — `packages/bitget-adapter` (real public market data,
+  shock/cooldown reactor with first-spike rejection, internal paper engine,
+  ranker, agent stack, backtest) + `apps/web` `/bitget` judge dashboard.
+- **BNB submission** — `packages/{cmc,twak,bsc}-adapter` + `packages/bnb-agent`
+  (the full gate-chain pipeline, scheduler, runtime ops), `apps/api` (kill-switch),
+  `apps/worker` (recovery + loop + snapshots), `apps/web` `/bsc` dashboards incl.
+  the `/bsc/proof` judge scoreboard.
 
-- Signal Mandate type + runtime Zod schema
-- Configurable risk parameters with strict env loading
-- Friction model (real cost + simulated scoring cost)
-- Net-edge gate
-- Volatility-derived stops with size-coherence check
-- Three-layer drawdown governor (competition / window / daily)
-- Shadow-fill guard
-- Score → expected-move calibration mapping
-- Address-keyed eligible-token allowlist (native BNB / WBNB never held)
-- Deterministic signal scorer (BSC + Bitget)
-- Risk Constitution gate chain
-- Append-only JSONL audit logger with hash chaining
+Docs: `docs/{SETUP,COMPETITION_RULES,BITGET_SUBMISSION,BNB_SUBMISSION,SPECIAL_PRIZES,
+SAFETY,LLM_POLICY,ECONOMICS,OPERATIONS,PREFLIGHT,SELF_AUDIT}.md`. Start with
+`docs/SETUP.md`.
 
 ## Develop
 
 ```bash
 pnpm install
-pnpm -r typecheck
-pnpm -r test
+pnpm typecheck && pnpm lint && pnpm test
+pnpm demo:twak-refusal              # see TWAK refuse bad trades
+pnpm --filter @runeclaw/web dev     # dashboards on http://localhost:3000
 ```
 
 ## Safety

@@ -1,126 +1,121 @@
 # Self-Audit
 
-Status: shared core + Bitget reactor engine complete. The Bitget judge dashboard
-and the full BNB-live build are not yet built; their rows are marked
-`pending(...)` — listed, not silently dropped.
+Status: shared core + Bitget submission + BNB submission built. ~190 tests pass;
+`typecheck`, `lint`, and the Next.js build are green. Items needing a real external
+binding (TWAK SDK, CMC x402 live payment, BNB AI Agent SDK, live RPC quoter) have
+real, tested interfaces that **fail loudly** until wired — marked accordingly, not
+silently dropped.
 
 ## Coverage traceability
 
 | Spec section | Requirement | Status | Evidence |
 |---|---|---|---|
-| 0 | No fake data; fail loudly; documented env; testable core | implemented | `scripts/*` fail loud; `.env.example`; `packages/core` tests |
+| 0 | No fake data; fail loudly; documented env; testable core | implemented | adapters fail loud; `.env.example`; tests |
 | 0.1 | Verified competition rules captured | implemented | `competitionRules.ts`, `docs/COMPETITION_RULES.md`, `verify:competition-rules` |
-| 0.1a | Address-keyed eligible allowlist; BNB/WBNB never held | implemented | `eligibleTokens.ts`, `test/eligibility.test.ts` |
-| 0.1b | Four open items surfaced as warnings, conservative defaults authoritative | implemented | `competitionRules.ts` warnings; `config.ts` defaults |
-| 0.1c | TWAK prize rubric mapped | pending(bnb) | `docs/SPECIAL_PRIZES.md` not yet written |
-| 0.2 | Deterministic configurable risk gates | implemented | `riskConstitution.ts`, `test/riskGates.test.ts` |
-| 0.3 | BSC chain + spot-router pinning | implemented (core) | `riskConstitution.ts` (chainId 56, router, spot-only); TWAK adapter pending(bnb) |
-| 0.4 | ERC-20 approval hygiene | implemented (core) | `riskConstitution.ts` approval gate, `test/riskGates.test.ts`; on-chain revoke pending(bnb) |
-| 0.5 | LLM model policy + provider abstraction | implemented | `llm/*`, `test/llm.test.ts`, `docs/LLM_POLICY.md` |
-| 0.6 | x402 payment policy | pending(bnb) | trade-loop integration not yet built |
-| 0.7 | Audit truth policy (integrity vs anchors) | implemented | `proofAnchors.ts`, `auditLogger.ts`, `test/coreModules.test.ts` |
-| 0.8 | Micro-capital friction + net-edge + sizer | implemented | `frictionModel.ts`, `netEdgeGate.ts`, `test/economics.test.ts` |
-| 0.8a | Volatility stops + size coherence | implemented | `stopCoherence.ts`, `test/economics.test.ts` |
-| 0.9 | Three-layer governor + shadow-fill + hourly snapshot | implemented | `drawdownGovernor.ts`, `shadowFill.ts`, `hourlySnapshot.ts`, tests |
-| 0.10 | Offense doctrine + calibration | implemented (core) | `edgeCalibration.ts`, `scripts/calibrate-edge.ts`; live data feed pending(bnb) |
-| 0.11 | Ops resilience (recovery, RPC failover, alerts, kill-switch) | partial | `recovery.ts` + `test/coreModules.test.ts`; failover/alerts/kill-switch pending(bnb worker/api) |
-| 0.12 | Dress-rehearsal gate | pending(bnb) | `rehearsal:checklist` not yet built |
-| 0.13 | Scope tiering | implemented | this file orders MUST→SHOULD→NICE |
-| 0.14 | Clean modern UI | partial | Bitget dashboard in `apps/web` (Next.js + Tailwind + Recharts, responsive, empty/stale states); BNB dashboards pending |
-| 1 | Signal Mandate primitive | implemented | `types.ts`, `signalMandate.ts`, `test/mandate.test.ts` |
-| 2 | Submission split | partial | Bitget engine in `packages/bitget-adapter` (Bitget-only, no CMC/TWAK/BNB/BSC); BNB build pending |
-| 3.1 | Strategy compiler | implemented | `strategyCompiler.ts`, `test/strategyCompiler.test.ts` |
-| 3.2 | Signal Mandate object/schema | implemented | `signalMandate.ts`, `test/mandate.test.ts` |
-| 3.3 | Deterministic signal scorer | implemented | `signalScorer.ts`, `test/scorer.test.ts` |
-| 3.4 | Risk constitution | implemented | `riskConstitution.ts`, `test/riskGates.test.ts` |
-| 3.5 | Trade-count vs survival precedence | implemented (core) | micro-scout exemption + survival gating in `riskConstitution.ts`; scheduler pending(bnb) |
-| 3.6 | Watchdog | implemented | `watchdog.ts`, `test/coreModules.test.ts` |
-| 3.7 | Audit logger + hash chain | implemented | `auditLogger.ts`, `test/audit.test.ts` |
-| 3.8 | Backtester / paper engine | implemented | `backtester.ts`, `test/backtester.test.ts` |
-| 3.9 | LLM runtime layer + bypass tests | implemented | `llm/*`, `test/strategyCompiler.test.ts`, `test/llm.test.ts` |
-| 4.1–4.6 | Bitget reactor: xStock universe, real market data, paper engine, agent stack, shock/cooldown strategy, LLM usage bounds | implemented | `packages/bitget-adapter/*`, 38 tests |
-| 4.3 | Execution-mode priority (official demo only if verified, else internal paper, labeled) | implemented | `executionAdapter.ts`, `test/executionAndRanker.test.ts` |
-| 4.7 | Bitget judge dashboard | implemented | `apps/web/app/bitget/*` — overview, mandates, mandate detail, backtest, replay; reads real `data/` artifacts; `next build` green |
-| 4.9 | Bitget paper demo on real inputs, net-edge as quality filter | implemented | `agents.ts`, `scripts/run-bitget-paper.ts` |
-| 5.x | BNB live build | pending(bnb) | — |
-| 6 | Tech stack / monorepo layout | partial | core + bitget-adapter packages + `apps/web` (Next.js) in place; api/worker pending(bnb) |
-| 7 | Environment variables documented | implemented | `.env.example`, `config.ts` loader |
-| 8 | Tests | partial | core (82) + Bitget (38) green; BNB/ops integration tests pending |
-| 9 | Deliverables | partial | shared-core + Bitget engine done; Bitget UI + BNB deliverables pending |
-| 10 | Demo scripts + preflight | pending(bitget/bnb) | — |
-| 11 | README + docs | partial | README, COMPETITION_RULES, ECONOMICS, LLM_POLICY, BITGET_SUBMISSION, SELF_AUDIT written; rest pending |
-| 12 | Special prize doc | pending(bnb) | — |
-| 13 | Final quality bar | partial | core + Bitget engine meet bar; UI + BNB pending |
+| 0.1a | Address-keyed eligible allowlist; BNB/WBNB never held | implemented | `eligibleTokens.ts`, `bsc-adapter/knownTokens.ts`, tests |
+| 0.1b | Four open items surfaced as warnings; conservative defaults authoritative | implemented | `competitionRules.ts`, `/bsc/rules` page |
+| 0.1c | TWAK prize rubric mapped | implemented | `docs/SPECIAL_PRIZES.md` (per point band) |
+| 0.2 | Deterministic configurable risk gates | implemented | `riskConstitution.ts`, `twak-adapter/policy.ts`, tests |
+| 0.3 | BSC chain + spot-router pinning | implemented | `riskConstitution.ts` + `twak policy` (chainId 56, router, spot-only), tests |
+| 0.4 | ERC-20 approval hygiene | implemented | approval gate in constitution + TWAK policy; revoke-on-stop intent in watchdog/worker |
+| 0.5 | LLM model policy + provider abstraction | implemented | `llm/*`, `docs/LLM_POLICY.md`, tests |
+| 0.6 | x402 in the trade loop | partial | `twak-adapter/x402.ts` (real interface + receipt chain, tested); live payment needs a configured TWAK executor |
+| 0.7 | Audit truth policy (integrity vs anchors) | implemented | `proofAnchors.ts`, replay pages |
+| 0.8 | Micro-capital friction + net-edge + sizer | implemented | `frictionModel.ts`, `netEdgeGate.ts`, pipeline, tests |
+| 0.8a | Volatility stops + size coherence | implemented | `stopCoherence.ts`, pipeline, tests |
+| 0.9 | Three-layer governor + shadow-fill + hourly snapshot | implemented | `drawdownGovernor.ts`, `shadowFill.ts`, `hourlySnapshot.ts`, worker, tests |
+| 0.10 | Offense doctrine + calibration | implemented | two families in `cmc-adapter/perception.ts` + pipeline; `edgeCalibration.ts`, `calibrate-edge`; live calibration run needs CMC history |
+| 0.11 | Ops resilience (recovery, RPC failover, alerts, kill-switch) | implemented | `recovery.ts`, `bsc-adapter/rpc.ts`, `bnb-agent/runtime.ts`, `apps/api`, `apps/worker`, `ops/pm2.config.cjs`, tests |
+| 0.12 | Dress-rehearsal gate | implemented | `scripts/rehearsal-checklist.ts`, worker live-mode gate, `docs/PREFLIGHT.md` |
+| 0.13 | Scope tiering | implemented | MUST built first across stages |
+| 0.14 | Clean modern UI | implemented | `apps/web` Bitget + BSC dashboards (Tailwind + Recharts, responsive, empty/stale states) |
+| 1 | Signal Mandate primitive | implemented | `types.ts`, `signalMandate.ts`, tests |
+| 2 | Submission split | implemented | Bitget-only adapter; BNB-only adapters; no cross-contamination |
+| 3.1–3.9 | Core engine pieces | implemented | `packages/core/*` + tests (85) |
+| 4.x | Bitget build + dashboard | implemented | `packages/bitget-adapter` (38 tests), `/bitget/*` |
+| 5.1–5.4a | BSC agent, TWAK sole executor, refusal demo | implemented | `bnb-agent`, `twak-adapter`, `scripts/demo-twak-refusal.ts` |
+| 5.5 | CMC Agent Hub multi-tool + attribution | partial | real quotes/trending/fear-greed + per-mandate attribution; more tools + live x402 extendable |
+| 5.6 | BNB AI Agent SDK orchestration | partial | orchestration graph realized as the pipeline/scheduler; a concrete BNB-SDK binding is a thin TODO (fails loud), no logic duplicated |
+| 5.8–5.12 | Two families, modes, thresholds, protections | implemented | `pipeline.ts`, `scheduler.ts`, scorer, governor |
+| 5.13–5.14 | BSC dashboard + `/bsc/proof` scoreboard | implemented | `apps/web/app/bsc/*` |
+| 6 | Tech stack / monorepo layout | implemented | `apps/{web,api,worker}` + `packages/*`; Fastify backend (not FastAPI) |
+| 7 | Environment variables documented | implemented | `.env.example`, `config.ts` |
+| 8 | Tests | implemented | core 85, bitget 38, twak 23, cmc 8, bsc 10, bnb-agent 26 |
+| 9 | Deliverables | implemented (partial on external-bound items above) | per-row evidence |
+| 10 | Demo scripts + preflight | implemented | `demo-twak-refusal`, `run-bsc-agent`, `run-bitget-paper`, `rehearsal:checklist` → `PREFLIGHT.md` |
+| 11 | README + docs | implemented | README + all `docs/*` |
+| 12 | Special prize doc | implemented | `docs/SPECIAL_PRIZES.md` |
+| 13 | Final quality bar | implemented (build-time); live execution pending real bindings | — |
 | 14 | Self-audit protocol | implemented | this document |
 
-## Honesty audit (shared core)
+## Honesty audit (full system)
 
-1. **Any fake data presented as real?** No. Every module is pure logic or fails
-   loudly. `build-eligible-tokens` and `calibrate-edge` refuse to run without real
-   inputs rather than fabricating contracts or samples.
-2. **Any path where LLM output reaches execution without passing every gate?** No.
-   There is no execution path yet; the strategy compiler clamps risk to caps and
-   the gate chain takes plain numbers, not LLM flags.
+1. **Any fake data presented as real?** No. CMC and Bitget clients hit real APIs
+   and fail loud; the worker/agent never sign or fabricate fills in dry mode; the
+   backtests label synthetic series; paper fills are labeled simulated.
+2. **Any path where LLM output reaches execution without every gate?** No. The LLM
+   produces only validated structured objects upstream; the gate chain and TWAK
+   policy take plain numbers/addresses, never LLM flags.
 3. **Any way a tx reaches TWAK that is not a chain-56 spot swap between eligible
-   contracts via an allowlisted router?** Not in core: the risk constitution
-   rejects non-spot, wrong-chain, off-router, ineligible-contract candidates. The
-   TWAK adapter itself is a BNB-live item.
-4. **Any path where a private key touches the backend/DB?** No. No signing code
-   exists yet; the design routes all signing through TWAK (BNB-live).
-5. **Can the agent duplicate a trade after a crash-restart?** The reconciliation
-   logic resolves submitted txs from chain state and flags duplicate nonces;
-   proven by `test/coreModules.test.ts`. The full worker wiring is BNB-live.
+   contracts via an allowlisted router?** No. Both the Risk Constitution and the
+   TWAK local policy reject non-spot, wrong-chain, off-router, off-spender,
+   ineligible-contract, and WBNB-held intents before signing (`policy.test.ts`,
+   `demo-twak-refusal`).
+4. **Any path where a private key touches the backend/DB?** No. API and worker
+   contain no signer; execution is TWAK-only. Keys are gitignored.
+5. **Can the agent duplicate a trade after a crash-restart?** No. The worker runs
+   `reconcile()` before any trade and resolves submitted-but-unconfirmed txs from
+   chain state; `recovery` is tested (`coreModules.test.ts`).
 6. **Is the allowlist keyed by contract address everywhere?** Yes — `eligibleTokens.ts`
-   keys by lowercased contract address; no symbol-keyed eligibility check exists.
-7. **Can the agent hold BNB or WBNB as a position?** No — `assertLegsEligible`
-   rejects native/WBNB legs with `REJECT_HELD_NATIVE_OR_WBNB`.
-8. **Are the four open items surfaced as warnings (not silent defaults)?** Yes —
-   `verify:competition-rules` prints them as warnings and the rules registry tags
-   them `needs-organizer-confirmation`.
-9. **Was every integration verified from official docs, failing loudly otherwise?**
-   No external integration is wired yet; the provider/script stubs that touch
-   external services fail loudly without keys/inputs. Real doc verification happens
-   when the adapters are built.
-10. **Is the calibration real or a placeholder?** The mapping and report builder
-    are real and tested; they consume real samples supplied by the script, which
-    refuses to fabricate them. The historical data feed comes with the BNB-live build.
-11. **Would the rehearsal checklist catch a broken TWAK pipeline?** Not yet — the
-    rehearsal gate is a BNB-live deliverable.
-12. **Would a replayed mandate be fully backed by anchors or labeled paper?** Yes
-    for the implemented replay engine: it surfaces external anchors and marks
-    paper-only mandates; `test/replay.test.ts`.
+   and the TWAK policy assert addresses; no symbol-keyed eligibility check exists.
+7. **Can the agent hold BNB or WBNB as a position?** No — rejected
+   `REJECT_HELD_NATIVE_OR_WBNB` in both gate layers.
+8. **Are the four open items surfaced as warnings?** Yes — `/bsc/rules` and
+   `verify:competition-rules`; defaults are authoritative.
+9. **Was every integration verified from docs, failing loud otherwise?** Real
+   clients (CMC, Bitget public) are wired and fail loud. TWAK SDK, CMC x402 live
+   payment, BNB AI Agent SDK, and the live RPC quoter are **unverified bindings**
+   that fail loudly until configured — never faked. This is stated in
+   `BNB_SUBMISSION.md` and the rows above.
+10. **Is the calibration real?** The mapping and report builder are real and
+    tested on real samples supplied by `calibrate-edge`; the worker/dry runs use a
+    clearly-labeled seed until a live calibration is produced, and live mode flags
+    a stale calibration.
+11. **Would the rehearsal checklist catch a broken TWAK pipeline / failed
+    registration?** Yes — `rehearsal:checklist` marks registration, a real swap, a
+    watchdog exit, and the kill-switch as steps that must be confirmed; the worker
+    refuses live mode unless the gate passed.
+12. **Would a replayed mandate be fully backed by anchors or labeled paper?** Yes —
+    `replayMandate` surfaces anchors and the paper-only flag; dry-run BSC mandates
+    are labeled (no tx hash) and the `/bsc/proof` ledger shows "dry run" until a
+    real tx lands.
 
-## Honesty audit (Bitget reactor engine)
+**Surfaced limitations (not hidden):** live on-chain execution, the CMC x402
+payment, the BNB AI Agent SDK binding, and on-chain registration require their real
+external services and are performed during the dress rehearsal — the build proves
+the full decision/guardrail pipeline and the ops loop deterministically, and fails
+loud everywhere a real binding is missing.
 
-1. **Any fake data presented as real?** No. Market data comes from the real
-   Bitget public v2 API; the client throws on an error code, empty payload, or
-   bad HTTP rather than inventing a price. Paper fills are labeled
-   `internal_paper_engine` / `simulated: true` and are never called exchange
-   fills. Agent Hub news/sentiment is fail-loud (`UnverifiedAgentHub`); the
-   backtest's synthetic fallback is explicitly labeled `synthetic_*` in its report.
-2. **LLM reaching execution without gates?** No. The reactor and paper risk gate
-   are pure deterministic functions; the LLM only compiles strategy / classifies
-   real news and cannot enter a trade.
-3. **Official Bitget demo faked?** No. `OfficialBitgetDemoExecutor` throws
-   "not implemented (endpoints unverified)" — it never silently fabricates a fill.
-   `selectExecutionMode` only returns `official_bitget_demo` when explicitly told
-   it is verified.
-4. **xPerps?** Disabled module; `assertXPerpsEnabled` refuses to run.
-5. **xStock symbols?** Best-effort and marked NEEDS VERIFICATION; an unresolved
-   symbol fails loudly and is skipped, never priced. Documented in
-   `BITGET_SUBMISSION.md` and `universe.ts`.
-6. **Audit integrity?** Every cycle writes hash-chained events; `test/agents.test.ts`
-   asserts `verifyChain === -1` end to end, and mandates validate via `parseMandate`.
+## Adversarial self-review (§14.3)
 
-The Bitget judge **dashboard** (§4.7, §0.14) is now built (`apps/web`) — a clean,
-modern Next.js + Tailwind + Recharts UI that reads only real `data/` artifacts and
-shows explicit empty/stale states (never invented numbers). `next build` is green;
-all 5 routes render. Live-paper mandate data requires reaching the Bitget public
-API, so in an offline environment the mandate views correctly show empty states
-while the backtest view renders a real (synthetic-labeled) report.
+- **Malicious strategy** ("ignore risk limits, all-in"): the compiler clamps every
+  risk number to configured caps (`strategyCompiler.test.ts`) — cannot exceed them.
+- **Bad intents** (non-spot, off-list, same-symbol-wrong-contract, WBNB-held,
+  infinite approval, unknown spender, wrong chain, action mismatch, over-cap): each
+  rejected with the right code (`policy.test.ts`, `pipeline.test.ts`,
+  `demo-twak-refusal`).
+- **Crash mid-run**: `reconcile()` resolves from chain, prevents duplicates
+  (`coreModules.test.ts`).
+- **Dead RPC**: `RpcManager` fails over / throws rather than hangs (`bsc.test.ts`).
+- **Malformed/hallucinated LLM output**: rejected, fails safe (`llm.test.ts`).
+- **Drawdown to soft threshold**: governor shrinks size toward zero; survival mode
+  arms; the stable↔stable Micro-Scout still satisfies the daily minimum
+  (`pipeline.test.ts`, `scheduler.test.ts`, `watchdog`).
+- **Zero-trade day near deadline**: scheduler flags `dailyTradeAtRisk` and routes
+  to the Micro-Scout when safe, else holds + alerts (`scheduler.test.ts`).
 
 ## Gate
 
-`pnpm install && pnpm typecheck && pnpm lint && pnpm test` is green: **123 tests**
-(85 core + 38 Bitget); `pnpm --filter @runeclaw/web build` is green. No silent
-gaps; every unbuilt item is listed as pending.
+`pnpm install && pnpm typecheck && pnpm lint && pnpm test` is green (~190 tests);
+`pnpm --filter @runeclaw/web build` is green. No silent gaps; every external-bound
+item is listed with its real, fail-loud interface and what configuring it unlocks.
