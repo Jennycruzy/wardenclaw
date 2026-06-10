@@ -38,6 +38,9 @@ importers:
       '@runeclaw/bitget-adapter':
         specifier: workspace:*
         version: link:../../packages/bitget-adapter
+      '@runeclaw/bsc-adapter':
+        specifier: workspace:*
+        version: link:../../packages/bsc-adapter
       '@runeclaw/core':
         specifier: workspace:*
         version: link:../../packages/core

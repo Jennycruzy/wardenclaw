@@ -1,7 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-const NAV = [
+export interface NavItem {
+  href: string;
+  label: string;
+}
+
+const BITGET_NAV: NavItem[] = [
   { href: "/bitget", label: "Overview" },
   { href: "/bitget/mandates", label: "Mandates" },
   { href: "/bitget/backtest", label: "Backtest" },
@@ -12,22 +17,31 @@ export function Shell({
   title,
   subtitle,
   actions,
+  nav = BITGET_NAV,
+  brand = "Stocks",
+  home = "/bitget",
+  footer,
 }: {
   children: ReactNode;
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  nav?: NavItem[];
+  brand?: string;
+  home?: string;
+  footer?: ReactNode;
 }) {
+  const NAV = nav;
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-16 sm:px-6">
       <header className="sticky top-0 z-10 -mx-4 mb-6 border-b border-line/70 bg-bg/80 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/bitget" className="group flex items-center gap-2.5">
+          <Link href={home} className="group flex items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-attack text-[13px] font-bold text-bg">
               R
             </span>
             <span className="text-sm font-semibold tracking-tight">
-              RUNECLAW <span className="text-ink-muted">Stocks</span>
+              RUNECLAW <span className="text-ink-muted">{brand}</span>
             </span>
           </Link>
           <nav className="flex items-center gap-1 text-sm">
@@ -55,8 +69,12 @@ export function Shell({
       <main className="flex-1">{children}</main>
 
       <footer className="mt-10 border-t border-line/60 pt-4 text-xs text-ink-faint">
-        Integrity: JSONL hash chain · Truth anchors: paper-fill source + market-data timestamp ·
-        Paper trading on real Bitget market data — fills are simulated, never exchange fills.
+        {footer ?? (
+          <>
+            Integrity: JSONL hash chain · Truth anchors: paper-fill source + market-data timestamp ·
+            Paper trading on real Bitget market data — fills are simulated, never exchange fills.
+          </>
+        )}
       </footer>
     </div>
   );

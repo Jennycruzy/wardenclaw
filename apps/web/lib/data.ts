@@ -190,6 +190,95 @@ export function getLatestBacktest(): BacktestReport | null {
 
 // ---- Environment / mode readouts -----------------------------------------
 
+// ---- BSC (BNB submission) -------------------------------------------------
+
+export function loadBscMandates(): SignalMandate[] {
+  const files = listFiles(AUDIT_DIR, ".mandates.jsonl");
+  const all: SignalMandate[] = [];
+  for (const f of files) {
+    for (const m of readJsonl(f, (o) => parseMandate(o))) {
+      if (m.venue === "bsc") all.push(m);
+    }
+  }
+  all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return all;
+}
+
+export function getBscMandate(id: string): SignalMandate | null {
+  return loadBscMandates().find((m) => m.id === id) ?? null;
+}
+
+export interface BscProofStats {
+  total: number;
+  approved: number;
+  rejected: number;
+  byRejectCode: Array<{ code: string; count: number }>;
+  byFamily: Array<{ family: string; count: number }>;
+  lastUpdated: string | null;
+}
+
+export function computeBscProof(mandates: SignalMandate[]): BscProofStats {
+  const rejectCounts = new Map<string, number>();
+  const familyCounts = new Map<string, number>();
+  let approved = 0;
+  let rejected = 0;
+  for (const m of mandates) {
+    if (m.risk.approved) approved++;
+    else rejected++;
+    for (const r of m.decision.rejectedReasons ?? []) rejectCounts.set(r, (rejectCounts.get(r) ?? 0) + 1);
+    familyCounts.set(m.decision.signalFamily, (familyCounts.get(m.decision.signalFamily) ?? 0) + 1);
+  }
+  return {
+    total: mandates.length,
+    approved,
+    rejected,
+    byRejectCode: [...rejectCounts.entries()].map(([code, count]) => ({ code, count })).sort((a, b) => b.count - a.count),
+    byFamily: [...familyCounts.entries()].map(([family, count]) => ({ family, count })),
+    lastUpdated: mandates[0]?.createdAt ?? null,
+  };
+}
+
+export interface HourlySnapshotRow {
+  hourIso: string;
+  valueUsd: number;
+}
+
+export function loadHourlySnapshots(): HourlySnapshotRow[] {
+  const files = listFiles(AUDIT_DIR, ".snapshots.jsonl");
+  const rows: HourlySnapshotRow[] = [];
+  for (const f of files) {
+    rows.push(...readJsonl(f, (o) => o as HourlySnapshotRow));
+  }
+  rows.sort((a, b) => (a.hourIso < b.hourIso ? -1 : 1));
+  return rows;
+}
+
+export interface BscEnv {
+  walletAddress: string | null;
+  registrationTxHash: string | null;
+  competitionContract: string;
+  startingCapitalUsd: number;
+  executionType: string;
+  routerAllowed: string;
+  twakConfigured: boolean;
+  cmcConfigured: boolean;
+  rpcConfigured: boolean;
+}
+
+export function readBscEnv(): BscEnv {
+  return {
+    walletAddress: process.env.TWAK_AGENT_WALLET ?? null,
+    registrationTxHash: process.env.REGISTRATION_TX_HASH ?? null,
+    competitionContract: process.env.COMPETITION_CONTRACT_ADDRESS ?? "0x212c61b9b72c95d95bf29cf032f5e5635629aed5",
+    startingCapitalUsd: Number(process.env.STARTING_CAPITAL_USD ?? "40"),
+    executionType: process.env.EXECUTION_TYPE ?? "spot_only",
+    routerAllowed: process.env.ROUTER_ALLOWED ?? "pancakeswap",
+    twakConfigured: Boolean(process.env.TWAK_CONFIG_PATH || process.env.TWAK_AGENT_WALLET),
+    cmcConfigured: Boolean(process.env.CMC_API_KEY),
+    rpcConfigured: Boolean(process.env.BSC_RPC_URLS),
+  };
+}
+
 export interface DashboardEnv {
   llmEnabled: boolean;
   llmProvider: string;

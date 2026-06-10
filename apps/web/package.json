@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@runeclaw/bitget-adapter": "workspace:*",
+    "@runeclaw/bsc-adapter": "workspace:*",
     "@runeclaw/core": "workspace:*",
     "next": "14.2.15",
     "react": "18.3.1",
