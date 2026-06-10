@@ -12,6 +12,7 @@
   "dependencies": {
     "@runeclaw/bnb-agent": "workspace:*",
     "@runeclaw/core": "workspace:*",
+    "dotenv": "^16.4.5",
     "fastify": "^5.1.0"
   },
   "devDependencies": {

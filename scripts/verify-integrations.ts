@@ -7,6 +7,8 @@
  *   pnpm verify:integrations -- --live  # require live-trading integrations
  */
 
+import "dotenv/config";
+
 interface Integration {
   name: string;
   configured: boolean;

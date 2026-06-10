@@ -17,6 +17,8 @@
  *   BITGET_CYCLES            (default 1 — number of poll cycles to run)
  */
 
+import "dotenv/config";
+
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { AuditLogger, appendMandate } from "@runeclaw/core";

@@ -17,6 +17,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { config as loadDotenv } from "dotenv";
 import {
   AuditLogger,
   appendMandate,
@@ -61,6 +62,8 @@ function repoRoot(): string {
 }
 
 const ROOT = repoRoot();
+// Load the monorepo-root .env so secrets are picked up regardless of cwd.
+loadDotenv({ path: join(ROOT, ".env") });
 const RUNTIME_DIR = join(ROOT, "data", "runtime");
 const AUDIT_DIR = join(ROOT, "data", "audit");
 const config = loadRiskConfig(process.env as Record<string, string | undefined>);

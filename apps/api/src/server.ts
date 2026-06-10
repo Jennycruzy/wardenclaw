@@ -12,9 +12,27 @@
  * never signs or moves funds — that is TWAK's job alone.
  */
 
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { config as loadDotenv } from "dotenv";
 import Fastify from "fastify";
 import { KillSwitch, sendAlert } from "@runeclaw/bnb-agent";
 import { readHeartbeat, writeKillFlag, readKillFlag } from "./state.js";
+
+// Load the monorepo-root .env regardless of the process cwd (pnpm runs the
+// package script from apps/api, so walk up to where pnpm-workspace.yaml lives).
+(() => {
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, ".env"))) {
+      loadDotenv({ path: join(dir, ".env") });
+      return;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+})();
 
 const PORT = Number(process.env.API_PORT ?? "4000");
 const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_SECONDS ?? "60") * 1000;

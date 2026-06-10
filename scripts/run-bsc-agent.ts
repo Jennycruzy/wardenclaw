@@ -15,6 +15,8 @@
  * in the worker, not this script. This script is for pre-window validation.
  */
 
+import "dotenv/config";
+
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {

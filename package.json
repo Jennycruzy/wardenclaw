@@ -30,6 +30,7 @@
     "@runeclaw/cmc-adapter": "workspace:*",
     "@runeclaw/core": "workspace:*",
     "@runeclaw/twak-adapter": "workspace:*",
+    "dotenv": "^16.4.5",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }

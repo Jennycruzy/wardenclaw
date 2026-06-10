@@ -13,7 +13,8 @@
     "@runeclaw/bsc-adapter": "workspace:*",
     "@runeclaw/cmc-adapter": "workspace:*",
     "@runeclaw/core": "workspace:*",
-    "@runeclaw/twak-adapter": "workspace:*"
+    "@runeclaw/twak-adapter": "workspace:*",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

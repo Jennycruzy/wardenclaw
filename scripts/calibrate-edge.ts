@@ -7,6 +7,8 @@
  * a loss condition.
  */
 
+import "dotenv/config";
+
 import { readFile, writeFile } from "node:fs/promises";
 import { buildCalibrationReport, type CalibrationSample } from "@runeclaw/core";
 

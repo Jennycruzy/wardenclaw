@@ -6,6 +6,8 @@
  * addresses.
  */
 
+import "dotenv/config";
+
 import { writeFile } from "node:fs/promises";
 import { ENUMERATED_ELIGIBLE_SYMBOLS, type EligibleToken } from "@runeclaw/core";
 
