@@ -26,7 +26,7 @@ and the full BNB-live build are not yet built; their rows are marked
 | 0.11 | Ops resilience (recovery, RPC failover, alerts, kill-switch) | partial | `recovery.ts` + `test/coreModules.test.ts`; failover/alerts/kill-switch pending(bnb worker/api) |
 | 0.12 | Dress-rehearsal gate | pending(bnb) | `rehearsal:checklist` not yet built |
 | 0.13 | Scope tiering | implemented | this file orders MUST→SHOULD→NICE |
-| 0.14 | Clean modern UI | pending(bitget/bnb) | no UI yet |
+| 0.14 | Clean modern UI | partial | Bitget dashboard in `apps/web` (Next.js + Tailwind + Recharts, responsive, empty/stale states); BNB dashboards pending |
 | 1 | Signal Mandate primitive | implemented | `types.ts`, `signalMandate.ts`, `test/mandate.test.ts` |
 | 2 | Submission split | partial | Bitget engine in `packages/bitget-adapter` (Bitget-only, no CMC/TWAK/BNB/BSC); BNB build pending |
 | 3.1 | Strategy compiler | implemented | `strategyCompiler.ts`, `test/strategyCompiler.test.ts` |
@@ -40,10 +40,10 @@ and the full BNB-live build are not yet built; their rows are marked
 | 3.9 | LLM runtime layer + bypass tests | implemented | `llm/*`, `test/strategyCompiler.test.ts`, `test/llm.test.ts` |
 | 4.1–4.6 | Bitget reactor: xStock universe, real market data, paper engine, agent stack, shock/cooldown strategy, LLM usage bounds | implemented | `packages/bitget-adapter/*`, 38 tests |
 | 4.3 | Execution-mode priority (official demo only if verified, else internal paper, labeled) | implemented | `executionAdapter.ts`, `test/executionAndRanker.test.ts` |
-| 4.7 | Bitget judge dashboard | pending(bitget-ui) | engine + audit/replay data produced; Next.js pages not yet built |
+| 4.7 | Bitget judge dashboard | implemented | `apps/web/app/bitget/*` — overview, mandates, mandate detail, backtest, replay; reads real `data/` artifacts; `next build` green |
 | 4.9 | Bitget paper demo on real inputs, net-edge as quality filter | implemented | `agents.ts`, `scripts/run-bitget-paper.ts` |
 | 5.x | BNB live build | pending(bnb) | — |
-| 6 | Tech stack / monorepo layout | partial | core + bitget-adapter packages in place; apps (web/api/worker) pending |
+| 6 | Tech stack / monorepo layout | partial | core + bitget-adapter packages + `apps/web` (Next.js) in place; api/worker pending(bnb) |
 | 7 | Environment variables documented | implemented | `.env.example`, `config.ts` loader |
 | 8 | Tests | partial | core (82) + Bitget (38) green; BNB/ops integration tests pending |
 | 9 | Deliverables | partial | shared-core + Bitget engine done; Bitget UI + BNB deliverables pending |
@@ -112,10 +112,15 @@ and the full BNB-live build are not yet built; their rows are marked
 6. **Audit integrity?** Every cycle writes hash-chained events; `test/agents.test.ts`
    asserts `verifyChain === -1` end to end, and mandates validate via `parseMandate`.
 
-Known gap (not hidden): the Bitget judge **dashboard** (§4.7, §0.14 MUST) is not
-yet built — only the engine, audit, and replay data it will render.
+The Bitget judge **dashboard** (§4.7, §0.14) is now built (`apps/web`) — a clean,
+modern Next.js + Tailwind + Recharts UI that reads only real `data/` artifacts and
+shows explicit empty/stale states (never invented numbers). `next build` is green;
+all 5 routes render. Live-paper mandate data requires reaching the Bitget public
+API, so in an offline environment the mandate views correctly show empty states
+while the backtest view renders a real (synthetic-labeled) report.
 
 ## Gate
 
-`pnpm install && pnpm typecheck && pnpm lint && pnpm test` is green: **120 tests**
-(82 core + 38 Bitget). No silent gaps; every unbuilt item is listed as pending.
+`pnpm install && pnpm typecheck && pnpm lint && pnpm test` is green: **123 tests**
+(85 core + 38 Bitget); `pnpm --filter @runeclaw/web build` is green. No silent
+gaps; every unbuilt item is listed as pending.

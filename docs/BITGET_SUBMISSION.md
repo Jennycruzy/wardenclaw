@@ -74,9 +74,14 @@ BITGET_CYCLES=10 BITGET_POLL_SECONDS=60 pnpm run:bitget-paper
 # Backtest the reactor (real symbol, or synthetic fallback if unavailable)
 pnpm backtest:bitget -- NVDAXUSDT
 pnpm backtest:bitget            # synthetic shock-and-run series
+
+# Judge dashboard
+pnpm --filter @runeclaw/web dev   # http://localhost:3000/bitget
 ```
 
-Audit trails are written to `data/audit/`; backtest reports to `data/backtests/`.
+Audit trails (events + full mandates) are written to `data/audit/`; backtest
+reports to `data/backtests/`. The dashboard reads these real files directly and
+shows clean empty states with run instructions when none exist.
 
 ## Execution mode is always shown
 
@@ -94,8 +99,20 @@ rumor/stale gates; confirmed entry; paper open/close with labeled simulated fill
 mark-to-market equity; ranking; execution-mode selection; the disabled xPerps
 module; the fail-loud Agent Hub; and the backtest PnL/drawdown report.
 
-## Still to build for this submission
+## Judge dashboard (`apps/web`)
 
-The clean, modern read-only **judge dashboard** (`/bitget`, `/bitget/mandates`,
-`/bitget/mandates/:id`, `/bitget/backtest`, `/bitget/replay/:id`) per §0.14 and
-§4.7 — the engine, audit, and replay data it renders are already produced here.
+A clean, modern read-only Next.js dashboard (App Router + Tailwind, dark theme,
+Recharts), fully responsive for phone viewing:
+
+- `/bitget` — overview: execution mode, LLM/Agent-Hub status, xStock universe,
+  paper-mandate stats, reject-code breakdown chart, recent mandates.
+- `/bitget/mandates` — every Signal Mandate, traded or skipped.
+- `/bitget/mandates/[id]` — full mandate: decision, economics (net-edge), risk,
+  execution (with the labeled simulated fill), perception + proof anchors.
+- `/bitget/backtest` — PnL/return/drawdown/win-rate, equity-curve chart, trade
+  table, rejections; the source (real vs. synthetic) is labeled.
+- `/bitget/replay/[id]` — hash-chain integrity, truth anchors, per-stage outputs,
+  reject codes, and an event timeline.
+
+Every view handles loading/empty/error/stale states. It renders only real
+artifacts from `data/`; it never fabricates numbers to look fuller.

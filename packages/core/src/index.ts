@@ -11,6 +11,7 @@ export * from "./signalScorer.js";
 export * from "./auditLogger.js";
 export * from "./riskConstitution.js";
 export * from "./signalMandate.js";
+export * from "./mandateStore.js";
 export * from "./strategyCompiler.js";
 export * from "./watchdog.js";
 export * from "./recovery.js";

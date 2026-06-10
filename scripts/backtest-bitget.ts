@@ -71,6 +71,10 @@ async function main(): Promise<void> {
     },
     rejections: result.rejections,
     trades: result.trades,
+    equityCurve: result.equityCurve.map((p) => ({
+      time: p.time,
+      equityUsd: Number(p.equityUsd.toFixed(2)),
+    })),
   };
 
   const dir = join(process.cwd(), "data", "backtests");

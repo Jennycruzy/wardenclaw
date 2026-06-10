@@ -19,7 +19,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AuditLogger } from "@runeclaw/core";
+import { AuditLogger, appendMandate } from "@runeclaw/core";
 import {
   BitgetPublicMarketData,
   BitgetReactorAgent,
@@ -52,7 +52,9 @@ async function main(): Promise<void> {
   });
   const auditDir = join(process.cwd(), "data", "audit");
   mkdirSync(auditDir, { recursive: true });
-  const auditPath = join(auditDir, `bitget-paper-${Date.now()}.jsonl`);
+  const runId = `bitget-paper-${Date.now()}`;
+  const auditPath = join(auditDir, `${runId}.jsonl`);
+  const mandatesPath = join(auditDir, `${runId}.mandates.jsonl`);
   const audit = new AuditLogger(auditPath);
   const book = new PaperBook(10_000);
 
@@ -115,6 +117,9 @@ async function main(): Promise<void> {
       );
     } else {
       const result = await agent.runCycle(perceptions);
+      for (const mandate of result.mandates) {
+        await appendMandate(mandatesPath, mandate);
+      }
       console.log(
         `[bitget] cycle ${cycle + 1}/${cycles}: evaluated ${result.mandates.length}, ` +
           `executed ${result.executedAsset ?? "none"}, equity ~$${book
@@ -129,6 +134,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`[bitget] audit trail: ${auditPath}`);
+  console.log(`[bitget] mandates:    ${mandatesPath}`);
 }
 
 main().catch((err) => {

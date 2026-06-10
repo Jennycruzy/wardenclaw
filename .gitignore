@@ -10,6 +10,10 @@ coverage/
 .DS_Store
 .turbo/
 *.tsbuildinfo
+# Next.js
+.next/
+next-env.d.ts
+out/
 # never commit keys / wallet material
 *.key
 *.pem
