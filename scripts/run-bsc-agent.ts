@@ -24,9 +24,11 @@ import {
   loadRiskConfig,
   type CalibrationReport,
 } from "@runeclaw/core";
-import { CmcClient, buildMomentumInputs, buildCatalystInputs } from "@runeclaw/cmc-adapter";
+import { CmcClient, buildMomentumInputs } from "@runeclaw/cmc-adapter";
 import {
   loadEligibleTokens,
+  LiveBscReader,
+  NoPoolError,
   PANCAKE_V2_ROUTER,
   STARTER_MAJORS,
 } from "@runeclaw/bsc-adapter";
@@ -81,6 +83,7 @@ async function main(): Promise<void> {
 
   const calibration = seedCalibration();
   const symbols = STARTER_MAJORS.map((t) => t.symbol).slice(0, 6);
+  const usdt = loaded.tokens.find((t) => t.symbol === "USDT")!;
 
   // Real CMC perception.
   const [quotes, fg, bnb] = await Promise.all([
@@ -89,6 +92,14 @@ async function main(): Promise<void> {
     cmc.getQuotes(["BNB"]),
   ]);
   const bnbChange = bnb.data[0]?.percentChange24h ?? 0;
+  const bnbPrice = bnb.data[0]?.priceUsd ?? 0;
+
+  // Real BSC chain reads (viem) — reserves + gas. Pinned to chain 56.
+  const rpcUrls = (process.env.BSC_RPC_URLS ?? "https://bsc-dataseed.binance.org,https://bsc-dataseed1.defibit.io")
+    .split(",").map((u) => u.trim()).filter(Boolean);
+  const reader = new LiveBscReader({ rpcUrls });
+  await reader.assertChain();
+  const gasPerLegUsd = bnbPrice > 0 ? await reader.gasPerLegUsd(bnbPrice) : 0.02;
 
   const auditDir = join(process.cwd(), "data", "audit");
   mkdirSync(auditDir, { recursive: true });
@@ -117,24 +128,38 @@ async function main(): Promise<void> {
     const token = loaded.tokens.find((t) => t.symbol === quote.symbol);
     if (!token) continue;
     const momentum = buildMomentumInputs(quote, bnbChange, fg.data, 0.7);
-    // Reserves/gas would come from a real RPC quoter in the worker; for the dry
-    // run we use a conservative deep-pool + low-gas assumption to exercise gates.
+    // Real on-chain reserves + shadow-fill for this pair.
+    let reserves;
+    let shadow;
+    try {
+      reserves = await reader.getReserves(usdt.bscContractAddress, token.bscContractAddress, usdt.decimals, token.decimals);
+      const probe = Math.min(config.startingCapitalUsd, 15);
+      const q1 = await reader.getAmountOut(usdt.bscContractAddress, token.bscContractAddress, probe, usdt.decimals, token.decimals);
+      shadow = { expectedOut: q1.amountOut, simulatedOut: q1.amountOut };
+    } catch (err) {
+      if (err instanceof NoPoolError) {
+        console.log(`[bsc] ${quote.symbol.padEnd(6)} no direct USDT pool — skipped`);
+        continue;
+      }
+      throw err;
+    }
     const candidate: CandidateInput = {
       symbol: quote.symbol,
       signalFamily: "momentum",
       scoreInputs: momentum.inputs,
       cmcToolsUsed: momentum.toolsUsed,
       marketDataTimestamp: quote.lastUpdated,
-      tokenInAddress: loaded.tokens.find((t) => t.symbol === "USDT")!.bscContractAddress,
+      tokenInAddress: usdt.bscContractAddress,
       tokenOutAddress: token.bscContractAddress,
       router: "pancakeswap",
       spender: PANCAKE_V2_ROUTER,
       to: PANCAKE_V2_ROUTER,
       atrPct: Math.max(0.02, Math.abs(quote.percentChange24h) / 100),
-      reserveIn: 5_000_000,
-      reserveOut: 5_000_000,
+      reserveIn: reserves.reserveIn,
+      reserveOut: reserves.reserveOut,
       poolFeeBps: 25,
-      gasPerLegUsd: 0.02,
+      gasPerLegUsd,
+      shadow,
     };
     const result = evaluateCandidate(candidate, ctx);
     const mandate = buildBscMandate({

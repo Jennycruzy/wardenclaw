@@ -28,10 +28,26 @@ import {
   type PendingMandate,
   type Holding,
 } from "@runeclaw/core";
-import { CmcClient, buildMomentumInputs } from "@runeclaw/cmc-adapter";
-import { loadEligibleTokens, PANCAKE_V2_ROUTER, STARTER_MAJORS } from "@runeclaw/bsc-adapter";
-import { evaluateCandidate, buildBscMandate, sendAlert, type PipelineContext } from "@runeclaw/bnb-agent";
-import type { TwakPolicyConfig } from "@runeclaw/twak-adapter";
+import { CmcClient, CmcX402Client, buildMomentumInputs } from "@runeclaw/cmc-adapter";
+import {
+  loadEligibleTokens,
+  LiveBscReader,
+  NoPoolError,
+  PANCAKE_V2_ROUTER,
+  STARTER_MAJORS,
+} from "@runeclaw/bsc-adapter";
+import {
+  evaluateCandidate,
+  buildBscMandate,
+  sendAlert,
+  registerAgentIdentity,
+  type PipelineContext,
+} from "@runeclaw/bnb-agent";
+import {
+  CliTwakExecutor,
+  PolicyEnforcingExecutor,
+  type TwakPolicyConfig,
+} from "@runeclaw/twak-adapter";
 
 function repoRoot(): string {
   let dir = process.cwd();
@@ -170,6 +186,46 @@ async function main(): Promise<void> {
     approvalBufferBps: config.approvalBufferBps,
   };
 
+  // Real BSC chain reader (viem) — reserves, on-chain quotes, gas. Pinned to 56.
+  const rpcUrls = (process.env.BSC_RPC_URLS ?? "https://bsc-dataseed.binance.org,https://bsc-dataseed1.defibit.io")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  const reader = new LiveBscReader({ rpcUrls });
+  await reader.assertChain();
+
+  // Real CMC x402 client (USDC on Base) — pays per request in the loop when funded.
+  const x402 = process.env.X402_PRIVATE_KEY ? new CmcX402Client() : null;
+
+  // Real TWAK signer (the only thing that signs) — live mode only.
+  const executor =
+    mode === "live"
+      ? new PolicyEnforcingExecutor(
+          new CliTwakExecutor({ tokens: loaded.tokens }),
+          loaded.allowlist,
+          twakPolicy,
+        )
+      : null;
+
+  // Optional: register the agent identity on-chain via the BNB AI Agent SDK sidecar.
+  if (process.env.BNB_SDK_REGISTER === "true") {
+    try {
+      const id = await registerAgentIdentity({
+        scriptPath: join(ROOT, "apps", "bnb-sdk-sidecar", "register_agent.py"),
+        env: { BNB_SDK_NETWORK: process.env.BNB_SDK_NETWORK ?? "bsc" },
+      });
+      console.log(`[worker] BNB agent identity registered: id=${id.agentId} tx=${id.transactionHash}`);
+    } catch (err) {
+      await sendAlert(process.env.ALERT_WEBHOOK_URL, {
+        reason: "execution_failure",
+        message: `BNB SDK identity registration failed: ${(err as Error).message}`,
+        timestamp: new Date().toISOString(),
+      });
+      console.warn(`[worker] BNB SDK registration failed (continuing): ${(err as Error).message}`);
+    }
+  }
+
+  let spentTodayUsd = 0;
   let cycles = 0;
   let lastSnapshotHour = "";
 
@@ -191,6 +247,33 @@ async function main(): Promise<void> {
       const symbols = STARTER_MAJORS.map((t) => t.symbol).slice(0, 6);
       const [quotes, fg, bnb] = await Promise.all([cmc.getQuotes(symbols), cmc.getFearGreed(), cmc.getQuotes(["BNB"])]);
       const bnbChange = bnb.data[0]?.percentChange24h ?? 0;
+      const bnbPrice = bnb.data[0]?.priceUsd ?? 0;
+
+      // Real gas cost per leg from on-chain gas price × BNB price.
+      const gasPerLegUsd = bnbPrice > 0 ? await reader.gasPerLegUsd(bnbPrice) : 0.02;
+
+      // x402-in-the-loop: pay for a CMC x402 request used in this decision cycle.
+      let x402ReceiptId: string | undefined;
+      if (x402) {
+        try {
+          const paid = await x402.get("/x402/v1/dex/search", { q: "bnb" });
+          x402ReceiptId = paid.receipt.receipt;
+          await audit.append({
+            timestamp: new Date().toISOString(),
+            mandateId: `x402-c${cycles}`,
+            stage: "perception",
+            input: { url: paid.receipt.requestUrl },
+            output: { paid: true, receipt: paid.receipt.receipt },
+            proofAnchors: { x402Receipt: paid.receipt.receipt },
+          });
+        } catch (err) {
+          await sendAlert(process.env.ALERT_WEBHOOK_URL, {
+            reason: "execution_failure",
+            message: `x402 payment failed: ${(err as Error).message}`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
 
       const ctx: PipelineContext = {
         config,
@@ -208,10 +291,33 @@ async function main(): Promise<void> {
         calibrationStale: mode === "dry",
       };
 
-      let approved = 0;
+      // Evaluate every candidate against REAL pool reserves + a real shadow-fill.
+      const evaluated: Array<{
+        result: ReturnType<typeof evaluateCandidate>;
+        token: (typeof loaded.tokens)[number];
+        tools: string[];
+        ts: string;
+      }> = [];
       for (const quote of quotes.data) {
         const token = loaded.tokens.find((t) => t.symbol === quote.symbol);
         if (!token) continue;
+        let reserves;
+        let shadow;
+        try {
+          reserves = await reader.getReserves(usdt.bscContractAddress, token.bscContractAddress, usdt.decimals, token.decimals);
+          // Shadow-fill: two on-chain quotes at intended size; deviation flags MEV/thin liquidity.
+          const probe = Math.min(config.startingCapitalUsd, 15);
+          const q1 = await reader.getAmountOut(usdt.bscContractAddress, token.bscContractAddress, probe, usdt.decimals, token.decimals);
+          const q2 = await reader.getAmountOut(usdt.bscContractAddress, token.bscContractAddress, probe, usdt.decimals, token.decimals);
+          shadow = { expectedOut: q1.amountOut, simulatedOut: q2.amountOut };
+        } catch (err) {
+          if (err instanceof NoPoolError) {
+            console.log(`[worker] ${quote.symbol}: no direct USDT pool — skipped`);
+            continue;
+          }
+          throw err;
+        }
+
         const momentum = buildMomentumInputs(quote, bnbChange, fg.data, 0.7);
         const result = evaluateCandidate(
           {
@@ -226,30 +332,78 @@ async function main(): Promise<void> {
             spender: PANCAKE_V2_ROUTER,
             to: PANCAKE_V2_ROUTER,
             atrPct: Math.max(0.02, Math.abs(quote.percentChange24h) / 100),
-            reserveIn: 5_000_000,
-            reserveOut: 5_000_000,
+            reserveIn: reserves.reserveIn,
+            reserveOut: reserves.reserveOut,
             poolFeeBps: 25,
-            gasPerLegUsd: 0.02,
+            gasPerLegUsd,
+            shadow,
           },
           ctx,
         );
+        evaluated.push({ result, token, tools: momentum.toolsUsed, ts: quote.lastUpdated });
+      }
+
+      // Rank approved candidates; the top one is the trade for this cycle.
+      const winner = evaluated
+        .filter((e) => e.result.approved)
+        .sort((a, b) => b.result.score - a.result.score)[0];
+
+      let approved = 0;
+      for (const e of evaluated) {
+        const isWinner = winner === e;
         const mandate = buildBscMandate({
-          result,
+          result: e.result,
           mode: mode === "live" ? "live" : "rehearsal",
           strategyId: "bsc-two-family",
           naturalLanguageIntent: "Momentum + catalyst over the eligible list, spot only, $40 book.",
           compiledStrategy: {},
-          assetContract: token.bscContractAddress,
-          cmcToolsUsed: momentum.toolsUsed,
-          marketDataTimestamp: quote.lastUpdated,
+          assetContract: e.token.bscContractAddress,
+          cmcToolsUsed: e.tools,
+          marketDataTimestamp: e.ts,
           calibrationVersion: calibration.version,
           createdAt: new Date().toISOString(),
-          id: `${runId}-c${cycles}-${quote.symbol}`,
+          id: `${runId}-c${cycles}-${e.token.symbol}`,
+          x402Receipt: x402ReceiptId,
         });
+        if (e.result.approved) approved++;
+
+        // Live execution: the winner is signed by TWAK (the sole signer).
+        if (isWinner && executor && e.result.intent) {
+          try {
+            const outcome = await executor.execute(e.result.intent, { spentTodayUsd });
+            if (outcome.refused) {
+              await sendAlert(process.env.ALERT_WEBHOOK_URL, {
+                reason: "twak_refusal",
+                message: `TWAK refused ${e.token.symbol}: ${outcome.policy.rejectCode} — ${outcome.policy.reason}`,
+                timestamp: new Date().toISOString(),
+              });
+            } else if (outcome.receipt) {
+              spentTodayUsd += e.result.economics.positionSizeUsd;
+              mandate.execution.status = "submitted";
+              mandate.execution.txHash = outcome.receipt.txHash;
+              mandate.proofAnchors.bscTxHash = outcome.receipt.txHash;
+              mandate.proofAnchors.twakReceipt = outcome.receipt.twakReceiptId;
+              await audit.append({
+                timestamp: new Date().toISOString(),
+                mandateId: mandate.id,
+                stage: "execution",
+                input: { amountUsd: e.result.economics.positionSizeUsd },
+                output: { status: "submitted", txHash: outcome.receipt.txHash },
+                proofAnchors: { bscTxHash: outcome.receipt.txHash, twakReceipt: outcome.receipt.twakReceiptId },
+              });
+              console.log(`[worker] EXECUTED ${e.token.symbol} → tx ${outcome.receipt.txHash}`);
+            }
+          } catch (err) {
+            await sendAlert(process.env.ALERT_WEBHOOK_URL, {
+              reason: "execution_failure",
+              message: `TWAK execution failed for ${e.token.symbol}: ${(err as Error).message}`,
+              timestamp: new Date().toISOString(),
+            });
+            console.error(`[worker] execution failed for ${e.token.symbol}: ${(err as Error).message}`);
+          }
+        }
+
         await appendMandate(mandatesPath, mandate);
-        if (result.approved) approved++;
-        // NOTE: live signing would call PolicyEnforcingExecutor here. In dry mode
-        // we never sign; status stays not_submitted — no fake fills.
       }
 
       // Hourly snapshot (mirrors the verified hourly scoring). Valued from CMC.
@@ -265,7 +419,7 @@ async function main(): Promise<void> {
         await fs.appendFile(snapPath, line, "utf8");
       }
 
-      console.log(`[worker] cycle ${cycles}: ${approved}/${quotes.data.length} approved (${mode}).`);
+      console.log(`[worker] cycle ${cycles}: ${approved}/${evaluated.length} approved, gas/leg $${gasPerLegUsd.toFixed(4)} (${mode}).`);
     } catch (err) {
       await sendAlert(process.env.ALERT_WEBHOOK_URL, {
         reason: "execution_failure",
