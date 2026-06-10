@@ -1,0 +1,137 @@
+/**
+ * Run the RUNECLAW Stocks reactor in paper mode against REAL Bitget public
+ * market data. This pulls live candles/tickers for the xStock universe, tracks
+ * shock/cooldown state across polling cycles, and paper-trades the confirmed
+ * continuation through the internal paper engine.
+ *
+ * It NEVER fabricates data: if a symbol returns no data from Bitget (xStock
+ * symbols may use a convention this build hasn't verified), it logs the failure
+ * loudly and skips that asset rather than inventing a price.
+ *
+ *   pnpm run:bitget-paper
+ *
+ * Env:
+ *   BITGET_PUBLIC_BASE_URL   (default https://api.bitget.com)
+ *   BITGET_CANDLE_GRANULARITY (default 5min)
+ *   BITGET_POLL_SECONDS      (default 60)
+ *   BITGET_CYCLES            (default 1 — number of poll cycles to run)
+ */
+
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { AuditLogger } from "@runeclaw/core";
+import {
+  BitgetPublicMarketData,
+  BitgetReactorAgent,
+  PaperBook,
+  DEFAULT_BITGET_AGENT_CONFIG,
+  TRADEABLE_XSTOCKS,
+  INDEX_PROXIES,
+  detectShock,
+  DEFAULT_REACTOR_CONFIG,
+  isTickerStale,
+  selectExecutionMode,
+  type AssetPerception,
+  type ShockDetection,
+  type BitgetAgentConfig,
+} from "@runeclaw/bitget-adapter";
+
+const granularity = process.env.BITGET_CANDLE_GRANULARITY ?? "5min";
+const pollSeconds = Number(process.env.BITGET_POLL_SECONDS ?? "60");
+const cycles = Number(process.env.BITGET_CYCLES ?? "1");
+const STALE_MS = 10 * 60_000;
+
+interface ShockState {
+  barsSinceShock: number | null;
+  armedShock?: ShockDetection;
+}
+
+async function main(): Promise<void> {
+  const md = new BitgetPublicMarketData({
+    baseUrl: process.env.BITGET_PUBLIC_BASE_URL,
+  });
+  const auditDir = join(process.cwd(), "data", "audit");
+  mkdirSync(auditDir, { recursive: true });
+  const auditPath = join(auditDir, `bitget-paper-${Date.now()}.jsonl`);
+  const audit = new AuditLogger(auditPath);
+  const book = new PaperBook(10_000);
+
+  const mode = selectExecutionMode({ officialDemoVerified: false, backtest: false });
+  console.log(`[bitget] execution mode: ${mode.mode} — ${mode.reason}`);
+
+  const cfg: BitgetAgentConfig = { ...DEFAULT_BITGET_AGENT_CONFIG, compiledStrategy: {} };
+  const agent = new BitgetReactorAgent(cfg, book, audit, auditPath);
+  const state = new Map<string, ShockState>();
+
+  for (let cycle = 0; cycle < cycles; cycle++) {
+    // Index support from the proxies (QQQx/SPYx) — real data only.
+    let indexSupport = 0.5;
+    try {
+      const proxy = INDEX_PROXIES[0]!;
+      const t = await md.getTicker(proxy.bitgetSymbol);
+      const span = t.high24h - t.low24h || 1;
+      indexSupport = Math.max(0, Math.min(1, (t.lastPrice - t.low24h) / span));
+    } catch (err) {
+      console.warn(`[bitget] index proxy unavailable: ${(err as Error).message}`);
+    }
+
+    const perceptions: AssetPerception[] = [];
+    const now = Date.now();
+    for (const sym of TRADEABLE_XSTOCKS) {
+      try {
+        const [ticker, candles] = await Promise.all([
+          md.getTicker(sym.bitgetSymbol),
+          md.getCandles(sym.bitgetSymbol, granularity, 50),
+        ]);
+        const st = state.get(sym.display) ?? { barsSinceShock: null };
+        const shock = detectShock(candles, DEFAULT_REACTOR_CONFIG.shock);
+        if (shock.isShock && st.barsSinceShock === null) {
+          st.barsSinceShock = 0;
+          st.armedShock = shock;
+        } else if (st.barsSinceShock !== null) {
+          st.barsSinceShock += 1;
+        }
+        state.set(sym.display, st);
+
+        perceptions.push({
+          asset: sym.display,
+          bars: candles,
+          barsSinceShock: st.barsSinceShock,
+          armedShock: st.armedShock,
+          midPrice: ticker.lastPrice,
+          marketDataTimestamp: ticker.timestamp,
+          indexSupport,
+          feedStale: isTickerStale(ticker, now, STALE_MS),
+        });
+      } catch (err) {
+        console.warn(`[bitget] ${sym.display} skipped (real data unavailable): ${(err as Error).message}`);
+      }
+    }
+
+    if (perceptions.length === 0) {
+      console.error(
+        "[bitget] no xStock data resolved. Verify the Bitget xStock symbol convention " +
+          "in packages/bitget-adapter/src/universe.ts before paper trading.",
+      );
+    } else {
+      const result = await agent.runCycle(perceptions);
+      console.log(
+        `[bitget] cycle ${cycle + 1}/${cycles}: evaluated ${result.mandates.length}, ` +
+          `executed ${result.executedAsset ?? "none"}, equity ~$${book
+            .equity(Object.fromEntries(perceptions.map((p) => [p.asset, p.midPrice])))
+            .toFixed(2)}`,
+      );
+    }
+
+    if (cycle < cycles - 1) {
+      await new Promise((r) => setTimeout(r, pollSeconds * 1000));
+    }
+  }
+
+  console.log(`[bitget] audit trail: ${auditPath}`);
+}
+
+main().catch((err) => {
+  console.error("[bitget] fatal:", err);
+  process.exitCode = 1;
+});

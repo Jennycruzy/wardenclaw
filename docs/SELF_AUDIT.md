@@ -1,8 +1,8 @@
 # Self-Audit
 
-Status as of the shared-core milestone. The Bitget build and the BNB-live build
-are not yet started; their rows are marked `pending(...)` — listed, not silently
-dropped.
+Status: shared core + Bitget reactor engine complete. The Bitget judge dashboard
+and the full BNB-live build are not yet built; their rows are marked
+`pending(...)` — listed, not silently dropped.
 
 ## Coverage traceability
 
@@ -28,7 +28,7 @@ dropped.
 | 0.13 | Scope tiering | implemented | this file orders MUST→SHOULD→NICE |
 | 0.14 | Clean modern UI | pending(bitget/bnb) | no UI yet |
 | 1 | Signal Mandate primitive | implemented | `types.ts`, `signalMandate.ts`, `test/mandate.test.ts` |
-| 2 | Submission split | pending(bitget/bnb) | adapters/apps not yet built |
+| 2 | Submission split | partial | Bitget engine in `packages/bitget-adapter` (Bitget-only, no CMC/TWAK/BNB/BSC); BNB build pending |
 | 3.1 | Strategy compiler | implemented | `strategyCompiler.ts`, `test/strategyCompiler.test.ts` |
 | 3.2 | Signal Mandate object/schema | implemented | `signalMandate.ts`, `test/mandate.test.ts` |
 | 3.3 | Deterministic signal scorer | implemented | `signalScorer.ts`, `test/scorer.test.ts` |
@@ -38,16 +38,19 @@ dropped.
 | 3.7 | Audit logger + hash chain | implemented | `auditLogger.ts`, `test/audit.test.ts` |
 | 3.8 | Backtester / paper engine | implemented | `backtester.ts`, `test/backtester.test.ts` |
 | 3.9 | LLM runtime layer + bypass tests | implemented | `llm/*`, `test/strategyCompiler.test.ts`, `test/llm.test.ts` |
-| 4.x | Bitget build | pending(bitget) | — |
+| 4.1–4.6 | Bitget reactor: xStock universe, real market data, paper engine, agent stack, shock/cooldown strategy, LLM usage bounds | implemented | `packages/bitget-adapter/*`, 38 tests |
+| 4.3 | Execution-mode priority (official demo only if verified, else internal paper, labeled) | implemented | `executionAdapter.ts`, `test/executionAndRanker.test.ts` |
+| 4.7 | Bitget judge dashboard | pending(bitget-ui) | engine + audit/replay data produced; Next.js pages not yet built |
+| 4.9 | Bitget paper demo on real inputs, net-edge as quality filter | implemented | `agents.ts`, `scripts/run-bitget-paper.ts` |
 | 5.x | BNB live build | pending(bnb) | — |
-| 6 | Tech stack / monorepo layout | partial | core package + workspace in place; apps/adapters pending |
+| 6 | Tech stack / monorepo layout | partial | core + bitget-adapter packages in place; apps (web/api/worker) pending |
 | 7 | Environment variables documented | implemented | `.env.example`, `config.ts` loader |
-| 8 | Tests | partial | core tier green (82 tests); Bitget/BNB/ops integration tests pending |
-| 9 | Deliverables | partial | shared-core deliverables done; submission deliverables pending |
+| 8 | Tests | partial | core (82) + Bitget (38) green; BNB/ops integration tests pending |
+| 9 | Deliverables | partial | shared-core + Bitget engine done; Bitget UI + BNB deliverables pending |
 | 10 | Demo scripts + preflight | pending(bitget/bnb) | — |
-| 11 | README + docs | partial | README, COMPETITION_RULES, ECONOMICS, LLM_POLICY, SELF_AUDIT written; rest pending |
+| 11 | README + docs | partial | README, COMPETITION_RULES, ECONOMICS, LLM_POLICY, BITGET_SUBMISSION, SELF_AUDIT written; rest pending |
 | 12 | Special prize doc | pending(bnb) | — |
-| 13 | Final quality bar | partial | core meets bar; submissions pending |
+| 13 | Final quality bar | partial | core + Bitget engine meet bar; UI + BNB pending |
 | 14 | Self-audit protocol | implemented | this document |
 
 ## Honesty audit (shared core)
@@ -87,7 +90,32 @@ dropped.
     for the implemented replay engine: it surfaces external anchors and marks
     paper-only mandates; `test/replay.test.ts`.
 
+## Honesty audit (Bitget reactor engine)
+
+1. **Any fake data presented as real?** No. Market data comes from the real
+   Bitget public v2 API; the client throws on an error code, empty payload, or
+   bad HTTP rather than inventing a price. Paper fills are labeled
+   `internal_paper_engine` / `simulated: true` and are never called exchange
+   fills. Agent Hub news/sentiment is fail-loud (`UnverifiedAgentHub`); the
+   backtest's synthetic fallback is explicitly labeled `synthetic_*` in its report.
+2. **LLM reaching execution without gates?** No. The reactor and paper risk gate
+   are pure deterministic functions; the LLM only compiles strategy / classifies
+   real news and cannot enter a trade.
+3. **Official Bitget demo faked?** No. `OfficialBitgetDemoExecutor` throws
+   "not implemented (endpoints unverified)" — it never silently fabricates a fill.
+   `selectExecutionMode` only returns `official_bitget_demo` when explicitly told
+   it is verified.
+4. **xPerps?** Disabled module; `assertXPerpsEnabled` refuses to run.
+5. **xStock symbols?** Best-effort and marked NEEDS VERIFICATION; an unresolved
+   symbol fails loudly and is skipped, never priced. Documented in
+   `BITGET_SUBMISSION.md` and `universe.ts`.
+6. **Audit integrity?** Every cycle writes hash-chained events; `test/agents.test.ts`
+   asserts `verifyChain === -1` end to end, and mandates validate via `parseMandate`.
+
+Known gap (not hidden): the Bitget judge **dashboard** (§4.7, §0.14 MUST) is not
+yet built — only the engine, audit, and replay data it will render.
+
 ## Gate
 
-`pnpm install && pnpm typecheck && pnpm test` is green (82 tests). The shared core
-has no silent gaps; every unbuilt item is listed as pending for its build.
+`pnpm install && pnpm typecheck && pnpm lint && pnpm test` is green: **120 tests**
+(82 core + 38 Bitget). No silent gaps; every unbuilt item is listed as pending.

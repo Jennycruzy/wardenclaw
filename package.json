@@ -13,9 +13,12 @@
     "test": "pnpm -r test",
     "verify:competition-rules": "tsx scripts/verify-competition-rules.ts",
     "build:eligible-tokens": "tsx scripts/build-eligible-tokens.ts",
-    "calibrate:edge": "tsx scripts/calibrate-edge.ts"
+    "calibrate:edge": "tsx scripts/calibrate-edge.ts",
+    "run:bitget-paper": "tsx scripts/run-bitget-paper.ts",
+    "backtest:bitget": "tsx scripts/backtest-bitget.ts"
   },
   "devDependencies": {
+    "@runeclaw/bitget-adapter": "workspace:*",
     "@runeclaw/core": "workspace:*",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"

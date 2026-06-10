@@ -1,0 +1,112 @@
+/**
+ * Backtest wrapper that runs the reactor's shock/cooldown logic through the
+ * shared core backtester, so a Bitget backtest reflects the same first-spike
+ * rejection and cooldown the live paper agent applies. Friction is informational
+ * on the Bitget side (no real gas), but the net-edge filter still runs.
+ */
+
+import { runBacktest, type Bar, type BacktestResult, type SignalFn } from "@runeclaw/core";
+import type { BitgetCandle } from "./types.js";
+import { detectShock, DEFAULT_REACTOR_CONFIG, type ReactorConfig } from "./reactor.js";
+
+export interface ReactorBacktestConfig {
+  reactor: ReactorConfig;
+  startingCapitalUsd: number;
+  perTradeRiskPct: number;
+  stopAtrMultiple: number;
+  maxPositionPct: number;
+  netEdgeMinBps: number;
+  slippageBps: number;
+}
+
+export const DEFAULT_REACTOR_BACKTEST_CONFIG: ReactorBacktestConfig = {
+  reactor: DEFAULT_REACTOR_CONFIG,
+  startingCapitalUsd: 10_000,
+  perTradeRiskPct: 3,
+  stopAtrMultiple: 1.5,
+  maxPositionPct: 50,
+  netEdgeMinBps: 15,
+  slippageBps: 8,
+};
+
+/** Convert candles to the core backtester's Bar shape (price + atrPct). */
+export function candlesToBars(candles: BitgetCandle[], atrPeriod = 14): Bar[] {
+  const bars: Bar[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    const window = candles.slice(Math.max(0, i - atrPeriod), i + 1);
+    let trSum = 0;
+    let count = 0;
+    for (let j = 1; j < window.length; j++) {
+      const cur = window[j]!;
+      const prev = window[j - 1]!;
+      trSum += Math.max(
+        cur.high - cur.low,
+        Math.abs(cur.high - prev.close),
+        Math.abs(cur.low - prev.close),
+      );
+      count++;
+    }
+    const c = candles[i]!;
+    const atr = count > 0 && c.close > 0 ? trSum / count / c.close : 0.01;
+    bars.push({ time: c.time, price: c.close, atrPct: atr });
+  }
+  return bars;
+}
+
+/**
+ * Build a SignalFn that arms on a shock, waits out the cooldown, then signals a
+ * continuation entry. It tracks shock state across bars via a closure.
+ */
+export function reactorSignalFn(candles: BitgetCandle[], cfg: ReactorBacktestConfig): SignalFn {
+  let barsSinceShock: number | null = null;
+  let armedMagnitudePct = 0;
+  return (_bar, index, hasPosition): ReturnType<SignalFn> => {
+    const upTo = candles.slice(0, index + 1);
+    const shock = detectShock(upTo, cfg.reactor.shock);
+
+    if (barsSinceShock !== null) barsSinceShock += 1;
+    // Arm (or re-arm) on a fresh up-shock, capturing its magnitude for later.
+    if (shock.isShock && shock.direction === "up") {
+      barsSinceShock = 0;
+      armedMagnitudePct = shock.magnitudePct;
+    }
+
+    if (hasPosition) {
+      // The backtester enforces the volatility stop; no explicit signal exit here.
+      return null;
+    }
+
+    // Wait out the cooldown; the spike bar itself is never entered.
+    if (barsSinceShock === null || barsSinceShock < cfg.reactor.cooldownBars) {
+      return null;
+    }
+
+    // Confirmation: enter the continuation using the ARMED shock magnitude (the
+    // current bar is typically no longer a shock once volume normalizes).
+    const expectedMoveBps = Math.round(armedMagnitudePct * 10_000 * 0.4);
+    // Consume the armed shock so we don't re-enter every bar.
+    barsSinceShock = null;
+    armedMagnitudePct = 0;
+    return { score: 70, expectedMoveBps };
+  };
+}
+
+export function backtestReactor(
+  candles: BitgetCandle[],
+  cfg: ReactorBacktestConfig = DEFAULT_REACTOR_BACKTEST_CONFIG,
+): BacktestResult {
+  const bars = candlesToBars(candles);
+  return runBacktest(bars, reactorSignalFn(candles, cfg), {
+    startingCapitalUsd: cfg.startingCapitalUsd,
+    perTradeRiskPct: cfg.perTradeRiskPct,
+    stopAtrMultiple: cfg.stopAtrMultiple,
+    maxPositionPct: cfg.maxPositionPct,
+    netEdgeMinBps: cfg.netEdgeMinBps,
+    frictionBudgetBps: 100_000, // informational on Bitget; do not block on friction
+    scoringSimCostBps: 0,
+    gasPerLegUsd: 0,
+    slippageBps: cfg.slippageBps,
+    lpFeeBps: 0,
+    safetyBufferBps: 0,
+  });
+}
