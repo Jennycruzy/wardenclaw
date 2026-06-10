@@ -102,6 +102,24 @@ async function main(): Promise<void> {
   }
   const twakConfigured = Boolean(process.env.TWAK_CONFIG_PATH);
   const mode = twakConfigured ? "live" : "dry";
+
+  // Live competition mode refuses to start unless the dress rehearsal passed
+  // (§0.12), overridable only by explicit confirmation after manual live steps.
+  if (mode === "live" && process.env.REHEARSAL_OVERRIDE !== "true") {
+    const gate = join(RUNTIME_DIR, "rehearsal.json");
+    const passed = existsSync(gate)
+      ? Boolean((JSON.parse(readFileSync(gate, "utf8")) as { passed?: boolean }).passed)
+      : false;
+    if (!passed) {
+      console.error(
+        "✗ Live mode blocked: dress rehearsal not passed (§0.12).\n" +
+          "  Run `pnpm rehearsal:checklist`, complete the manual live steps, then either\n" +
+          "  pass all checks or set REHEARSAL_OVERRIDE=true to start with explicit confirmation.",
+      );
+      process.exit(1);
+    }
+  }
+
   console.log(`[worker] starting in ${mode.toUpperCase()} mode (interval ${intervalMs / 1000}s)`);
 
   mkdirSync(AUDIT_DIR, { recursive: true });

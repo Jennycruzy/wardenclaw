@@ -17,7 +17,11 @@
     "run:bitget-paper": "tsx scripts/run-bitget-paper.ts",
     "backtest:bitget": "tsx scripts/backtest-bitget.ts",
     "run:bsc-agent": "tsx scripts/run-bsc-agent.ts",
-    "demo:twak-refusal": "tsx scripts/demo-twak-refusal.ts"
+    "demo:twak-refusal": "tsx scripts/demo-twak-refusal.ts",
+    "backtest:bsc": "tsx scripts/backtest-bsc.ts",
+    "replay": "tsx scripts/replay-mandate.ts",
+    "rehearsal:checklist": "tsx scripts/rehearsal-checklist.ts",
+    "verify:integrations": "tsx scripts/verify-integrations.ts"
   },
   "devDependencies": {
     "@runeclaw/bitget-adapter": "workspace:*",
