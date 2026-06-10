@@ -11,9 +11,21 @@ importers:
       '@runeclaw/bitget-adapter':
         specifier: workspace:*
         version: link:packages/bitget-adapter
+      '@runeclaw/bnb-agent':
+        specifier: workspace:*
+        version: link:packages/bnb-agent
+      '@runeclaw/bsc-adapter':
+        specifier: workspace:*
+        version: link:packages/bsc-adapter
+      '@runeclaw/cmc-adapter':
+        specifier: workspace:*
+        version: link:packages/cmc-adapter
       '@runeclaw/core':
         specifier: workspace:*
         version: link:packages/core
+      '@runeclaw/twak-adapter':
+        specifier: workspace:*
+        version: link:packages/twak-adapter
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -86,8 +98,93 @@ importers:
         specifier: ^2.1.5
         version: 2.1.9(@types/node@22.19.20)
 
+  packages/bnb-agent:
+    dependencies:
+      '@runeclaw/bsc-adapter':
+        specifier: workspace:*
+        version: link:../bsc-adapter
+      '@runeclaw/cmc-adapter':
+        specifier: workspace:*
+        version: link:../cmc-adapter
+      '@runeclaw/core':
+        specifier: workspace:*
+        version: link:../core
+      '@runeclaw/twak-adapter':
+        specifier: workspace:*
+        version: link:../twak-adapter
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.20
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.19.20)
+
+  packages/bsc-adapter:
+    dependencies:
+      '@runeclaw/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.20
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.19.20)
+
+  packages/cmc-adapter:
+    dependencies:
+      '@runeclaw/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.20
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.19.20)
+
   packages/core:
     dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.20
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.19.20)
+
+  packages/twak-adapter:
+    dependencies:
+      '@runeclaw/core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^3.23.8
         version: 3.25.76

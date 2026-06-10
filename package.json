@@ -15,11 +15,17 @@
     "build:eligible-tokens": "tsx scripts/build-eligible-tokens.ts",
     "calibrate:edge": "tsx scripts/calibrate-edge.ts",
     "run:bitget-paper": "tsx scripts/run-bitget-paper.ts",
-    "backtest:bitget": "tsx scripts/backtest-bitget.ts"
+    "backtest:bitget": "tsx scripts/backtest-bitget.ts",
+    "run:bsc-agent": "tsx scripts/run-bsc-agent.ts",
+    "demo:twak-refusal": "tsx scripts/demo-twak-refusal.ts"
   },
   "devDependencies": {
     "@runeclaw/bitget-adapter": "workspace:*",
+    "@runeclaw/bnb-agent": "workspace:*",
+    "@runeclaw/bsc-adapter": "workspace:*",
+    "@runeclaw/cmc-adapter": "workspace:*",
     "@runeclaw/core": "workspace:*",
+    "@runeclaw/twak-adapter": "workspace:*",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }
