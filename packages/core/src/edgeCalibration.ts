@@ -53,6 +53,55 @@ export function edgeEstimate(score: number, report: CalibrationReport): number {
   return Math.max(0, Math.min(1, edge));
 }
 
+/** One observed sample for calibration: a signal score and the move it preceded. */
+export interface CalibrationSample {
+  score: number;
+  /** Realized move over the holding horizon, in bps (signed). */
+  realizedMoveBps: number;
+  /** Whether the trade direction was correct (a win). */
+  win: boolean;
+}
+
+/**
+ * Build a calibration report from real observed samples. Bands are formed at the
+ * given score thresholds; each band aggregates the samples at or above its
+ * threshold (and below the next). This consumes real historical data supplied by
+ * the calibration script — it never fabricates samples.
+ */
+export function buildCalibrationReport(
+  samples: CalibrationSample[],
+  scoreThresholds: number[],
+  meta: { version: string; generatedAt: string; historyDays: number },
+): CalibrationReport {
+  const thresholds = [...scoreThresholds].sort((a, b) => a - b);
+  const bands: CalibrationBand[] = thresholds.map((minScore, idx) => {
+    const next = thresholds[idx + 1] ?? Infinity;
+    const inBand = samples.filter((s) => s.score >= minScore && s.score < next);
+    const n = inBand.length;
+    const avgMove = n
+      ? inBand.reduce((sum, s) => sum + Math.abs(s.realizedMoveBps), 0) / n
+      : 0;
+    const hitRate = n ? inBand.filter((s) => s.win).length / n : 0;
+    // Predicted = the band's own threshold expressed in bps as a naive prior;
+    // realizedVsPredicted lets the script see how far the prior was off.
+    const predicted = minScore;
+    const realizedVsPredicted = predicted > 0 ? avgMove / predicted : 0;
+    return {
+      minScore,
+      realizedMoveBps: Number(avgMove.toFixed(2)),
+      hitRate: Number(hitRate.toFixed(4)),
+      realizedVsPredicted: Number(realizedVsPredicted.toFixed(4)),
+    };
+  });
+
+  return {
+    version: meta.version,
+    generatedAt: meta.generatedAt,
+    historyDays: meta.historyDays,
+    bands,
+  };
+}
+
 /** A calibration is stale when older than the configured max age. */
 export function isCalibrationStale(
   report: CalibrationReport,

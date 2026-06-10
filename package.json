@@ -10,9 +10,14 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "verify:competition-rules": "tsx scripts/verify-competition-rules.ts",
+    "build:eligible-tokens": "tsx scripts/build-eligible-tokens.ts",
+    "calibrate:edge": "tsx scripts/calibrate-edge.ts"
   },
   "devDependencies": {
+    "@runeclaw/core": "workspace:*",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }
 }
