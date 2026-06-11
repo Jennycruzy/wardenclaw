@@ -31,7 +31,7 @@ import {
 } from "./reactor.js";
 import { rankShocks, type ShockCandidate } from "./eventShockRanker.js";
 import { evaluatePaperRiskGate } from "./riskGate.js";
-import { PaperBook } from "./paperEngine.js";
+import { PaperBook, type PaperTrade } from "./paperEngine.js";
 import { atrPct, technicalDirection } from "./indicators.js";
 import type { DemoSpotExecutor, DemoOrderResult } from "./demoExecutor.js";
 
@@ -97,6 +97,8 @@ export interface CycleResult {
   mandates: SignalMandate[];
   /** The asset chosen for a paper entry this cycle, if any. */
   executedAsset: string | null;
+  /** Positions closed this cycle (stop, profit target, or max-hold time exit). */
+  exits: PaperTrade[];
 }
 
 let mandateSeq = 0;
@@ -155,8 +157,81 @@ export class BitgetReactorAgent {
     }
   }
 
+  /**
+   * Enforce exits on open positions against current real prices: the recorded
+   * volatility stop, the profit target, and the max-hold time exit. Every exit
+   * is executed in the book (and on Bitget demo when wired) and audited.
+   */
+  private async enforceExits(perceptions: AssetPerception[]): Promise<PaperTrade[]> {
+    const BAR_MS = 5 * 60_000;
+    const takeProfitPct = this.cfg.reactor.takeProfitPct ?? DEFAULT_REACTOR_CONFIG.takeProfitPct!;
+    const maxHoldBars = this.cfg.reactor.maxHoldBars ?? DEFAULT_REACTOR_CONFIG.maxHoldBars!;
+    const exits: PaperTrade[] = [];
+    for (const p of perceptions) {
+      const pos = this.book.getPosition(p.asset);
+      if (!pos || p.feedStale) continue;
+      const heldBars = (Date.parse(p.marketDataTimestamp) - Date.parse(pos.openedAt)) / BAR_MS;
+      let reason: PaperTrade["reason"] | null = null;
+      let why = "";
+      if (p.midPrice <= pos.stopPrice) {
+        reason = "stop";
+        why = `volatility stop hit (${p.midPrice} ≤ ${pos.stopPrice})`;
+      } else if (p.midPrice >= pos.entryPrice * (1 + takeProfitPct)) {
+        reason = "signal_exit";
+        why = `profit target +${(takeProfitPct * 100).toFixed(1)}% reached`;
+      } else if (heldBars >= maxHoldBars) {
+        reason = "signal_exit";
+        why = `max hold ${maxHoldBars} bars elapsed`;
+      }
+      if (!reason) continue;
+
+      const ts = this.now();
+      let demoOrder: DemoOrderResult | undefined;
+      let executionError: string | undefined;
+      if (this.cfg.executionMode === "official_bitget_demo" && this.wiring.demoExecutor && this.wiring.symbolFor) {
+        try {
+          demoOrder = await this.wiring.demoExecutor.marketSell({
+            symbol: this.wiring.symbolFor(p.asset),
+            baseQuantity: pos.quantity,
+          });
+        } catch (err) {
+          executionError = (err as Error).message;
+        }
+      }
+      const trade = this.book.close({
+        asset: p.asset,
+        refPrice: p.midPrice,
+        slippageBps: this.cfg.paperSlippageBps,
+        timestamp: ts,
+        reason,
+      });
+      exits.push(trade);
+      await this.audit.append({
+        timestamp: ts,
+        mandateId: pos.mandateId ?? `exit-${p.asset}-${ts}`,
+        stage: "settlement",
+        input: { asset: p.asset, midPrice: p.midPrice, heldBars: Math.floor(heldBars) },
+        output: {
+          reason,
+          why,
+          entryPrice: trade.entryPrice,
+          exitPrice: trade.exitPrice,
+          pnlUsd: Number(trade.pnlUsd.toFixed(2)),
+          pnlPct: Number(trade.pnlPct.toFixed(2)),
+          ...(demoOrder ? { demoOrderId: demoOrder.orderId } : {}),
+          ...(executionError ? { demoSellError: executionError } : {}),
+        },
+        proofAnchors: { marketDataTimestamp: p.marketDataTimestamp },
+      });
+    }
+    return exits;
+  }
+
   /** Evaluate every asset, rank the confirmed entries, execute the top one. */
   async runCycle(perceptions: AssetPerception[]): Promise<CycleResult> {
+    // Exits first: an open position must be managed before new entries compete.
+    const exits = await this.enforceExits(perceptions);
+
     const prices: Record<string, number> = {};
     for (const p of perceptions) prices[p.asset] = p.midPrice;
     const equityUsd = this.book.equity(prices);
@@ -198,7 +273,7 @@ export class BitgetReactorAgent {
       if (mandate.execution.status === "filled") executedAsset = perception.asset;
     }
 
-    return { mandates, executedAsset };
+    return { mandates, executedAsset, exits };
   }
 
   private async buildAndAudit(
@@ -329,6 +404,7 @@ export class BitgetReactorAgent {
               stopPrice: sizing.stopPrice,
               slippageBps: 0,
               timestamp: ts,
+              mandateId: id,
             });
           }
         } catch (err) {
@@ -343,6 +419,7 @@ export class BitgetReactorAgent {
           stopPrice: sizing.stopPrice,
           slippageBps: this.cfg.paperSlippageBps,
           timestamp: ts,
+          mandateId: id,
         });
         status = "filled";
         paperFill = { ...fill };

@@ -72,6 +72,14 @@ export interface ReactorConfig {
   minEntryScore: number;
   /** Maximum portfolio fraction a single xStock may occupy (0..1). */
   maxSingleStockPct: number;
+  /**
+   * Profit-target exit as a fraction of entry price (0.015 = +1.5%). Without a
+   * profit-taking rule the only exit is the volatility stop, which makes every
+   * trade a guaranteed eventual loser in a mean-reverting series.
+   */
+  takeProfitPct?: number;
+  /** Time exit: close after this many 5-minute bars if neither stop nor target hit. */
+  maxHoldBars?: number;
 }
 
 export const DEFAULT_REACTOR_CONFIG: ReactorConfig = {
@@ -80,7 +88,35 @@ export const DEFAULT_REACTOR_CONFIG: ReactorConfig = {
   minIndexSupport: 0.4,
   minEntryScore: 65,
   maxSingleStockPct: 0.5,
+  takeProfitPct: 0.015,
+  maxHoldBars: 48,
 };
+
+/**
+ * Reactor config with env overrides, so thresholds can be calibrated (see
+ * scripts/calibrate-bitget-reactor.ts) and tuned per deployment without a code
+ * change. Magnitude is a fraction (0.02 = 2%), matching ShockConfig.
+ */
+export function reactorConfigFromEnv(env: NodeJS.ProcessEnv = process.env): ReactorConfig {
+  const num = (v: string | undefined, fallback: number): number => {
+    if (v === undefined || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return {
+    shock: {
+      windowBars: num(env.BITGET_SHOCK_WINDOW_BARS, DEFAULT_SHOCK_CONFIG.windowBars),
+      minMagnitudePct: num(env.BITGET_SHOCK_MIN_MAGNITUDE_PCT, DEFAULT_SHOCK_CONFIG.minMagnitudePct),
+      minVolumeRatio: num(env.BITGET_SHOCK_MIN_VOLUME_RATIO, DEFAULT_SHOCK_CONFIG.minVolumeRatio),
+    },
+    cooldownBars: num(env.BITGET_COOLDOWN_BARS, DEFAULT_REACTOR_CONFIG.cooldownBars),
+    minIndexSupport: num(env.BITGET_MIN_INDEX_SUPPORT, DEFAULT_REACTOR_CONFIG.minIndexSupport),
+    minEntryScore: num(env.BITGET_MIN_ENTRY_SCORE, DEFAULT_REACTOR_CONFIG.minEntryScore),
+    maxSingleStockPct: num(env.BITGET_MAX_SINGLE_STOCK_PCT, DEFAULT_REACTOR_CONFIG.maxSingleStockPct),
+    takeProfitPct: num(env.BITGET_TAKE_PROFIT_PCT, DEFAULT_REACTOR_CONFIG.takeProfitPct!),
+    maxHoldBars: num(env.BITGET_MAX_HOLD_BARS, DEFAULT_REACTOR_CONFIG.maxHoldBars!),
+  };
+}
 
 export interface ClassifiedEvent {
   /** From the news/sentiment classifier (LLM over REAL article text). */

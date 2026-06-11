@@ -55,12 +55,19 @@ export function candlesToBars(candles: BitgetCandle[], atrPeriod = 14): Bar[] {
 
 /**
  * Build a SignalFn that arms on a shock, waits out the cooldown, then signals a
- * continuation entry. It tracks shock state across bars via a closure.
+ * continuation entry. It tracks shock state across bars via a closure, and
+ * mirrors the live agent's exit policy: the backtester enforces the volatility
+ * stop, while the profit target and max-hold time exit are signaled here.
  */
 export function reactorSignalFn(candles: BitgetCandle[], cfg: ReactorBacktestConfig): SignalFn {
   let barsSinceShock: number | null = null;
   let armedMagnitudePct = 0;
-  return (_bar, index, hasPosition): ReturnType<SignalFn> => {
+  let pendingEntryPrice: number | null = null;
+  let entryPrice: number | null = null;
+  let heldBars = 0;
+  const takeProfitPct = cfg.reactor.takeProfitPct ?? DEFAULT_REACTOR_CONFIG.takeProfitPct!;
+  const maxHoldBars = cfg.reactor.maxHoldBars ?? DEFAULT_REACTOR_CONFIG.maxHoldBars!;
+  return (bar, index, hasPosition): ReturnType<SignalFn> => {
     const upTo = candles.slice(0, index + 1);
     const shock = detectShock(upTo, cfg.reactor.shock);
 
@@ -72,9 +79,20 @@ export function reactorSignalFn(candles: BitgetCandle[], cfg: ReactorBacktestCon
     }
 
     if (hasPosition) {
-      // The backtester enforces the volatility stop; no explicit signal exit here.
+      // Entry filled on the bar that signaled it; adopt that price once.
+      if (entryPrice === null) entryPrice = pendingEntryPrice ?? bar.price;
+      heldBars += 1;
+      if (bar.price >= entryPrice * (1 + takeProfitPct) || heldBars >= maxHoldBars) {
+        entryPrice = null;
+        pendingEntryPrice = null;
+        heldBars = 0;
+        return { score: 0, expectedMoveBps: 0, exit: true };
+      }
       return null;
     }
+    // No position (flat, or the backtester's stop closed it): reset hold state.
+    entryPrice = null;
+    heldBars = 0;
 
     // Wait out the cooldown; the spike bar itself is never entered.
     if (barsSinceShock === null || barsSinceShock < cfg.reactor.cooldownBars) {
@@ -87,6 +105,7 @@ export function reactorSignalFn(candles: BitgetCandle[], cfg: ReactorBacktestCon
     // Consume the armed shock so we don't re-enter every bar.
     barsSinceShock = null;
     armedMagnitudePct = 0;
+    pendingEntryPrice = bar.price;
     return { score: 70, expectedMoveBps };
   };
 }

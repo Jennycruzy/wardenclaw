@@ -30,6 +30,8 @@ export interface PaperPosition {
   notionalUsd: number;
   stopPrice: number;
   openedAt: string;
+  /** Mandate that opened this position; links exits back to their entry audit. */
+  mandateId?: string;
 }
 
 export interface PaperTrade {
@@ -99,6 +101,7 @@ export class PaperBook {
     stopPrice: number;
     slippageBps: number;
     timestamp: string;
+    mandateId?: string;
   }): PaperFill {
     if (this.positions.has(args.asset)) {
       throw new Error(`paper position already open for ${args.asset}`);
@@ -116,6 +119,7 @@ export class PaperBook {
       notionalUsd: args.notionalUsd,
       stopPrice: args.stopPrice,
       openedAt: args.timestamp,
+      ...(args.mandateId ? { mandateId: args.mandateId } : {}),
     });
     const fill: PaperFill = {
       asset: args.asset,

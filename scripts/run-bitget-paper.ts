@@ -38,7 +38,7 @@ import {
   TRADEABLE_XSTOCKS,
   INDEX_PROXIES,
   detectShock,
-  DEFAULT_REACTOR_CONFIG,
+  reactorConfigFromEnv,
   isTickerStale,
   selectExecutionMode,
   type AssetPerception,
@@ -110,8 +110,17 @@ async function main(): Promise<void> {
     ({ executor: demoExecutor, client: demoClient } = OfficialBitgetDemoExecutor.spawn(demoCreds));
   }
 
+  // Reactor thresholds: env-overridable, calibrated by calibrate-bitget-reactor.
+  const reactor = reactorConfigFromEnv();
+  console.log(
+    `[bitget] reactor thresholds: shock ≥${(reactor.shock.minMagnitudePct * 100).toFixed(1)}% ` +
+      `over ${reactor.shock.windowBars} bars, volume ≥${reactor.shock.minVolumeRatio}×, ` +
+      `cooldown ${reactor.cooldownBars} bars, entry score ≥${reactor.minEntryScore}, ` +
+      `take-profit +${((reactor.takeProfitPct ?? 0) * 100).toFixed(1)}%, max hold ${reactor.maxHoldBars} bars`,
+  );
   const cfg: BitgetAgentConfig = {
     ...DEFAULT_BITGET_AGENT_CONFIG,
+    reactor,
     executionMode: mode.mode,
     compiledStrategy: {},
   };
@@ -162,7 +171,7 @@ async function main(): Promise<void> {
           md.getCandles(sym.bitgetSymbol, granularity, 50),
         ]);
         const st = state.get(sym.display) ?? { barsSinceShock: null };
-        const shock = detectShock(candles, DEFAULT_REACTOR_CONFIG.shock);
+        const shock = detectShock(candles, reactor.shock);
         if (shock.isShock && st.barsSinceShock === null) {
           st.barsSinceShock = 0;
           st.armedShock = shock;
@@ -195,6 +204,12 @@ async function main(): Promise<void> {
       const result = await agent.runCycle(perceptions);
       for (const mandate of result.mandates) {
         await appendMandate(mandatesPath, mandate);
+      }
+      for (const exit of result.exits) {
+        console.log(
+          `[bitget] EXIT ${exit.asset} (${exit.reason}): entry ${exit.entryPrice} → exit ${exit.exitPrice}, ` +
+            `pnl $${exit.pnlUsd.toFixed(2)} (${exit.pnlPct.toFixed(2)}%)`,
+        );
       }
       console.log(
         `[bitget] cycle ${cycle + 1}/${cycles}: evaluated ${result.mandates.length}, ` +
