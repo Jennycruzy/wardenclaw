@@ -2,6 +2,8 @@ export * from "./types.js";
 export * from "./universe.js";
 export * from "./marketData.js";
 export * from "./agentHub.js";
+export * from "./mcpClient.js";
+export * from "./mcpMarketData.js";
 export * from "./indicators.js";
 export * from "./reactor.js";
 export * from "./eventShockRanker.js";

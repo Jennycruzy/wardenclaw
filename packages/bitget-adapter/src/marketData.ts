@@ -48,7 +48,7 @@ function num(v: unknown, field: string): number {
 }
 
 export interface MarketDataSource {
-  readonly mode: "live_bitget_public";
+  readonly mode: "live_bitget_public" | "live_bitget_agent_hub_mcp";
   getTicker(symbol: string): Promise<BitgetTicker>;
   getCandles(symbol: string, granularity: string, limit: number): Promise<BitgetCandle[]>;
 }

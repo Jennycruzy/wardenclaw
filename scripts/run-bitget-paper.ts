@@ -24,6 +24,9 @@ import { join } from "node:path";
 import { AuditLogger, appendMandate } from "@wardenclaw/core";
 import {
   BitgetPublicMarketData,
+  BitgetMcpClient,
+  BitgetMcpMarketData,
+  type MarketDataSource,
   BitgetReactorAgent,
   PaperBook,
   DEFAULT_BITGET_AGENT_CONFIG,
@@ -49,9 +52,26 @@ interface ShockState {
 }
 
 async function main(): Promise<void> {
-  const md = new BitgetPublicMarketData({
-    baseUrl: process.env.BITGET_PUBLIC_BASE_URL,
-  });
+  // Perception source: the official Bitget Agent Hub MCP server when enabled
+  // (BITGET_AGENT_HUB_MCP=true), otherwise the public REST client. Both are real
+  // and fail loud; neither fabricates a price.
+  const useMcp = process.env.BITGET_AGENT_HUB_MCP === "true";
+  let mcpClient: BitgetMcpClient | undefined;
+  let md: MarketDataSource;
+  if (useMcp) {
+    mcpClient = new BitgetMcpClient({
+      modules: "spot",
+      readOnly: true,
+      apiKey: process.env.BITGET_API_KEY,
+      secretKey: process.env.BITGET_API_SECRET,
+      passphrase: process.env.BITGET_API_PASSPHRASE,
+    });
+    await mcpClient.start();
+    md = new BitgetMcpMarketData(mcpClient);
+  } else {
+    md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
+  }
+  console.log(`[bitget] perception source: ${md.mode}`);
   const auditDir = join(process.cwd(), "data", "audit");
   mkdirSync(auditDir, { recursive: true });
   const runId = `bitget-paper-${Date.now()}`;
@@ -137,6 +157,7 @@ async function main(): Promise<void> {
 
   console.log(`[bitget] audit trail: ${auditPath}`);
   console.log(`[bitget] mandates:    ${mandatesPath}`);
+  await mcpClient?.stop();
 }
 
 main().catch((err) => {

@@ -21,7 +21,9 @@
     "backtest:bsc": "tsx scripts/backtest-bsc.ts",
     "replay": "tsx scripts/replay-mandate.ts",
     "rehearsal:checklist": "tsx scripts/rehearsal-checklist.ts",
-    "verify:integrations": "tsx scripts/verify-integrations.ts"
+    "verify:integrations": "tsx scripts/verify-integrations.ts",
+    "verify:llm": "tsx scripts/verify-llm.ts",
+    "verify:bitget-hub": "tsx scripts/verify-bitget-hub.ts"
   },
   "devDependencies": {
     "@wardenclaw/bitget-adapter": "workspace:*",

@@ -19,3 +19,4 @@ out/
 *.key
 *.pem
 twak-config.json
+_wallet-backup/
