@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   let md: MarketDataSource;
   if (useMcp) {
     mcpClient = new BitgetMcpClient({
-      modules: "spot",
+      modules: "spot,futures",
       readOnly: true,
       apiKey: process.env.BITGET_API_KEY,
       secretKey: process.env.BITGET_API_SECRET,

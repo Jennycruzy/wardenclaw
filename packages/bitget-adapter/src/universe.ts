@@ -1,24 +1,25 @@
 /**
  * The xStock universe the reactor monitors, plus the optional (disabled) xPerps
- * module. The Bitget API symbols are best-effort and marked NEEDS VERIFICATION:
- * the market-data client fails loudly if a symbol returns no data, so an
- * unverified symbol surfaces as an error rather than a fabricated price.
+ * module. The market-data client fails loudly if a symbol returns no data, so a
+ * delisted/renamed symbol surfaces as an error rather than a fabricated price.
  */
 
 import type { XStockSymbol } from "./types.js";
 
 /**
  * Core tradeable xStock universe + index proxies for support checks.
- * `bitgetSymbol` values follow Bitget's tokenized-equity convention as best
- * understood; verify against official docs before live paper runs.
+ * `bitgetSymbol` values VERIFIED against the live Bitget spot API
+ * (GET /api/v2/spot/public/symbols, 2026-06-11): tokenized equities trade
+ * under the "<TICKER>ON" convention (e.g. NVDAONUSDT), with an alternate
+ * "R<TICKER>" series also listed.
  */
 export const XSTOCK_UNIVERSE: XStockSymbol[] = [
-  { display: "AAPLx", bitgetSymbol: "AAPLXUSDT", underlying: "AAPL", kind: "xstock" },
-  { display: "NVDAx", bitgetSymbol: "NVDAXUSDT", underlying: "NVDA", kind: "xstock" },
-  { display: "TSLAx", bitgetSymbol: "TSLAXUSDT", underlying: "TSLA", kind: "xstock" },
-  { display: "MSFTx", bitgetSymbol: "MSFTXUSDT", underlying: "MSFT", kind: "xstock" },
-  { display: "QQQx", bitgetSymbol: "QQQXUSDT", underlying: "QQQ", kind: "index_proxy" },
-  { display: "SPYx", bitgetSymbol: "SPYXUSDT", underlying: "SPY", kind: "index_proxy" },
+  { display: "AAPLx", bitgetSymbol: "AAPLONUSDT", underlying: "AAPL", kind: "xstock" },
+  { display: "NVDAx", bitgetSymbol: "NVDAONUSDT", underlying: "NVDA", kind: "xstock" },
+  { display: "TSLAx", bitgetSymbol: "TSLAONUSDT", underlying: "TSLA", kind: "xstock" },
+  { display: "MSFTx", bitgetSymbol: "MSFTONUSDT", underlying: "MSFT", kind: "xstock" },
+  { display: "QQQx", bitgetSymbol: "QQQONUSDT", underlying: "QQQ", kind: "index_proxy" },
+  { display: "SPYx", bitgetSymbol: "SPYONUSDT", underlying: "SPY", kind: "index_proxy" },
 ];
 
 /** The tradeable (non-index-proxy) members of the universe. */

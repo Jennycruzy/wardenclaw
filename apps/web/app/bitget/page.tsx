@@ -48,7 +48,7 @@ export default function BitgetOverview() {
         <Card className="lg:col-span-2">
           <SectionTitle
             title="xStock universe"
-            subtitle="Bitget symbols are NEEDS-VERIFICATION; unresolved symbols fail loudly, never priced."
+            subtitle="Symbols verified against the live Bitget spot API (<TICKER>ON convention); unresolved symbols fail loudly, never priced."
           />
           <div className="flex flex-wrap gap-2">
             {TRADEABLE_XSTOCKS.map((s) => (

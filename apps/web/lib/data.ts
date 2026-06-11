@@ -290,6 +290,8 @@ export function readDashboardEnv(): DashboardEnv {
   return {
     llmEnabled: process.env.LLM_ENABLED !== "false" && provider !== "disabled",
     llmProvider: provider,
-    agentHubConfigured: Boolean(process.env.BITGET_AGENT_HUB_BASE_URL),
+    agentHubConfigured:
+      process.env.BITGET_AGENT_HUB_MCP === "true" ||
+      Boolean(process.env.BITGET_AGENT_HUB_BASE_URL),
   };
 }
