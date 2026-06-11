@@ -71,6 +71,10 @@ pnpm run:bitget-paper
 # multi-cycle polling:
 BITGET_CYCLES=10 BITGET_POLL_SECONDS=60 pnpm run:bitget-paper
 
+# Interactive live console — full-screen scanner cockpit with keyboard control
+# ([space] pause, [t] trading on/off, [f] scan now, [x] close all, [q] quit)
+pnpm console:bitget
+
 # Backtest the reactor (real symbol, or synthetic fallback if unavailable)
 pnpm backtest:bitget -- NVDAXUSDT
 pnpm backtest:bitget            # synthetic shock-and-run series

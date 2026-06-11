@@ -156,11 +156,28 @@ async function main(): Promise<void> {
     );
   }
 
-  // Recommend: sane activity (0.5–4 trades/day across the universe), then most
-  // profitable, then shallowest drawdown. Falls back to the most active config.
-  const eligible = rows.filter((r) => r.tradesPerDay >= 0.5 && r.tradesPerDay <= 4);
-  const pool = eligible.length > 0 ? eligible : rows.filter((r) => r.trades > 0);
-  pool.sort((a, b) => b.pnlUsd - a.pnlUsd || a.worstMaxDrawdownPct - b.worstMaxDrawdownPct);
+  // Recommend: PROFITABLE first — a selective config that trades once a week
+  // and wins beats an active one that bleeds. Among profitable configs prefer
+  // the most active (more demo evidence), then shallowest drawdown. Only when
+  // nothing is profitable fall back to the least-negative config inside a sane
+  // activity band (0.5–4 trades/day), so the live demo still shows discipline.
+  const profitable = rows.filter((r) => r.trades > 0 && r.pnlUsd > 0);
+  let pool: SweepRow[];
+  if (profitable.length > 0) {
+    pool = profitable.sort(
+      (a, b) => b.tradesPerDay - a.tradesPerDay || b.pnlUsd - a.pnlUsd || a.worstMaxDrawdownPct - b.worstMaxDrawdownPct,
+    );
+  } else {
+    const eligible = rows.filter((r) => r.tradesPerDay >= 0.5 && r.tradesPerDay <= 4);
+    pool = (eligible.length > 0 ? eligible : rows.filter((r) => r.trades > 0)).sort(
+      (a, b) => b.pnlUsd - a.pnlUsd || a.worstMaxDrawdownPct - b.worstMaxDrawdownPct,
+    );
+    console.warn(
+      "\n[calibrate] WARNING: no profitable config in this window — recommending the " +
+        "least-negative active config. Consider widening BITGET_CALIBRATION_DAYS or " +
+        "keeping the agent in watch-only until conditions improve.",
+    );
+  }
   const best = pool[0];
   if (!best) {
     console.error("\n[calibrate] no config produced a single trade — market too quiet even at 1%.");

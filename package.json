@@ -15,6 +15,7 @@
     "build:eligible-tokens": "tsx scripts/build-eligible-tokens.ts",
     "calibrate:edge": "tsx scripts/calibrate-edge.ts",
     "run:bitget-paper": "tsx scripts/run-bitget-paper.ts",
+    "console:bitget": "tsx scripts/console-bitget.ts",
     "backtest:bitget": "tsx scripts/backtest-bitget.ts",
     "run:bsc-agent": "tsx scripts/run-bsc-agent.ts",
     "demo:twak-refusal": "tsx scripts/demo-twak-refusal.ts",
