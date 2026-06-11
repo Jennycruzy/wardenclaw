@@ -1,0 +1,34 @@
+# WARDENCLAW interactive console — autostart at boot inside a tmux session.
+#
+# The console is a full-screen interactive cockpit, so it lives in tmux (attach
+# with `tmux attach -t claw-console`, detach with Ctrl-B D) rather than under
+# pm2. The inner loop restarts the console if it ever crashes; systemd restarts
+# the tmux session if the whole thing dies.
+#
+# Install (as root on the VPS):
+#   cp ops/claw-console.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now claw-console
+#
+# Adjust WorkingDirectory/paths if the repo lives somewhere other than
+# /root/wardenclaw.
+
+[Unit]
+Description=WARDENCLAW xStock interactive console (tmux session claw-console)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=/root/wardenclaw
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStartPre=-/usr/bin/tmux kill-session -t claw-console
+ExecStart=/usr/bin/tmux new-session -d -s claw-console -x 120 -y 42 \
+  "/usr/bin/bash -lc 'cd /root/wardenclaw && while true; do pnpm console:bitget; echo \"[claw-console] exited — restarting in 5s\"; sleep 5; done'"
+ExecStop=/usr/bin/tmux kill-session -t claw-console
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
