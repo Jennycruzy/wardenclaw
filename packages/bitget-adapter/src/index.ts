@@ -4,6 +4,7 @@ export * from "./marketData.js";
 export * from "./agentHub.js";
 export * from "./mcpClient.js";
 export * from "./mcpMarketData.js";
+export * from "./mcpSentiment.js";
 export * from "./indicators.js";
 export * from "./reactor.js";
 export * from "./eventShockRanker.js";

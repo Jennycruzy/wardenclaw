@@ -26,6 +26,7 @@ import {
   BitgetPublicMarketData,
   BitgetMcpClient,
   BitgetMcpMarketData,
+  BitgetMcpAgentHub,
   type MarketDataSource,
   BitgetReactorAgent,
   PaperBook,
@@ -72,6 +73,9 @@ async function main(): Promise<void> {
     md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
   }
   console.log(`[bitget] perception source: ${md.mode}`);
+  // Real market-wide risk backdrop from the Agent Hub futures Skill (BTC funding
+  // + open interest). Crypto-derived, used only to modulate equity entries.
+  const agentHub = mcpClient ? new BitgetMcpAgentHub(mcpClient) : undefined;
   const auditDir = join(process.cwd(), "data", "audit");
   mkdirSync(auditDir, { recursive: true });
   const runId = `bitget-paper-${Date.now()}`;
@@ -97,6 +101,22 @@ async function main(): Promise<void> {
       indexSupport = Math.max(0, Math.min(1, (t.lastPrice - t.low24h) / span));
     } catch (err) {
       console.warn(`[bitget] index proxy unavailable: ${(err as Error).message}`);
+    }
+
+    // Blend in the real derivatives risk backdrop (Agent Hub funding/OI Skill).
+    if (agentHub) {
+      try {
+        const d = await agentHub.getDerivativesSentiment("BTCUSDT");
+        const macroSupport = Math.max(0, Math.min(1, (d.score + 1) / 2));
+        const blended = 0.7 * indexSupport + 0.3 * macroSupport;
+        console.log(
+          `[bitget] risk backdrop: regime=${d.regime} score=${d.score.toFixed(2)} ` +
+            `(BTC funding=${d.fundingRate}, OI=${d.openInterest}) → indexSupport ${indexSupport.toFixed(2)}→${blended.toFixed(2)}`,
+        );
+        indexSupport = blended;
+      } catch (err) {
+        console.warn(`[bitget] risk backdrop unavailable: ${(err as Error).message}`);
+      }
     }
 
     const perceptions: AssetPerception[] = [];
