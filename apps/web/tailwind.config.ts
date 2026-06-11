@@ -9,22 +9,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // WardenClaw editorial theme — high-contrast black/white/grayscale + neon green.
         bg: {
-          DEFAULT: "#0a0e14",
-          subtle: "#0e1420",
-          raised: "#121a28",
+          DEFAULT: "#050505",
+          subtle: "#0b0b0b",
+          raised: "#101010",
         },
-        line: "#1d2738",
+        line: "#242424",
         ink: {
-          DEFAULT: "#e6edf6",
-          muted: "#8b9bb4",
-          faint: "#5a6b85",
+          DEFAULT: "#ffffff",
+          muted: "#a3a3a3",
+          faint: "#6b6b6b",
         },
-        pos: "#34d399",
+        pos: "#00ff88",
         neg: "#fb7185",
         warn: "#fbbf24",
-        accent: "#60a5fa",
-        attack: "#a78bfa",
+        accent: "#00ff88",
+        attack: "#00b36b",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

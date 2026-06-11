@@ -12,12 +12,24 @@
   }
   body {
     background-image:
-      radial-gradient(900px 500px at 80% -10%, rgba(96, 165, 250, 0.07), transparent),
-      radial-gradient(700px 400px at 0% 0%, rgba(167, 139, 250, 0.06), transparent);
+      radial-gradient(900px 520px at 82% -12%, rgba(0, 255, 136, 0.06), transparent),
+      radial-gradient(700px 420px at -5% 0%, rgba(0, 255, 136, 0.04), transparent);
     background-attachment: fixed;
   }
+  /* Subtle film grain over the whole app for a premium printed-paper feel. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
   ::selection {
-    background: rgba(96, 165, 250, 0.3);
+    background: rgba(0, 255, 136, 0.32);
+    color: #000;
   }
 }
 

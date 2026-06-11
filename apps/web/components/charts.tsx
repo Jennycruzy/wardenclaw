@@ -13,8 +13,15 @@ import {
   YAxis,
 } from "recharts";
 
-const axis = { stroke: "#5a6b85", fontSize: 11 };
-const grid = "#1d2738";
+const axis = { stroke: "#6b6b6b", fontSize: 11 };
+const grid = "#242424";
+const tooltipStyle = {
+  background: "#0b0b0b",
+  border: "1px solid #242424",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "#ffffff",
+} as const;
 
 export function EquityCurve({ data }: { data: Array<{ time: string; equityUsd: number }> }) {
   const points = data.map((d, i) => ({ i, equityUsd: d.equityUsd }));
@@ -23,8 +30,8 @@ export function EquityCurve({ data }: { data: Array<{ time: string; equityUsd: n
       <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
         <defs>
           <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
-            <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+            <stop offset="0%" stopColor="#00ff88" stopOpacity={0.4} />
+            <stop offset="100%" stopColor="#00ff88" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid stroke={grid} vertical={false} />
@@ -38,17 +45,11 @@ export function EquityCurve({ data }: { data: Array<{ time: string; equityUsd: n
           tickFormatter={(v: number) => `$${Math.round(v).toLocaleString()}`}
         />
         <Tooltip
-          contentStyle={{
-            background: "#0e1420",
-            border: "1px solid #1d2738",
-            borderRadius: 12,
-            fontSize: 12,
-            color: "#e6edf6",
-          }}
+          contentStyle={tooltipStyle}
           formatter={(v: number) => [`$${v.toFixed(2)}`, "Equity"]}
           labelFormatter={(i) => `Bar ${i}`}
         />
-        <Area type="monotone" dataKey="equityUsd" stroke="#34d399" strokeWidth={2} fill="url(#eq)" />
+        <Area type="monotone" dataKey="equityUsd" stroke="#00ff88" strokeWidth={2} fill="url(#eq)" />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -71,13 +72,7 @@ export function RejectionBars({ data }: { data: Array<{ code: string; count: num
         />
         <Tooltip
           cursor={{ fill: "rgba(255,255,255,0.03)" }}
-          contentStyle={{
-            background: "#0e1420",
-            border: "1px solid #1d2738",
-            borderRadius: 12,
-            fontSize: 12,
-            color: "#e6edf6",
-          }}
+          contentStyle={tooltipStyle}
         />
         <Bar dataKey="count" radius={[0, 4, 4, 0]}>
           {short.map((_, i) => (

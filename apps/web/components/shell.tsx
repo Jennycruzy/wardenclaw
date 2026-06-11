@@ -37,8 +37,8 @@ export function Shell({
       <header className="sticky top-0 z-10 -mx-4 mb-6 border-b border-line/70 bg-bg/80 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href={home} className="group flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-attack text-[13px] font-bold text-bg">
-              R
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-attack text-[13px] font-bold text-bg shadow-[0_0_16px_-2px_rgba(0,255,136,0.55)]">
+              W
             </span>
             <span className="text-sm font-semibold tracking-tight">
               WARDENCLAW <span className="text-ink-muted">{brand}</span>
