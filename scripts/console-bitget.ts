@@ -69,6 +69,25 @@ const stripAnsi = (s: string) => s.replace(/\[[0-9;]*m/g, "");
 const visLen = (s: string) => stripAnsi(s).length;
 const padEndV = (s: string, n: number) => s + " ".repeat(Math.max(0, n - visLen(s)));
 const padStartV = (s: string, n: number) => " ".repeat(Math.max(0, n - visLen(s))) + s;
+/** Clip to n visible chars, passing ANSI codes through and re-resetting at the end. */
+function clipV(s: string, n: number): string {
+  if (visLen(s) <= n) return s;
+  let out = "";
+  let vis = 0;
+  for (let i = 0; i < s.length && vis < n - 1; i++) {
+    if (s[i] === "\u001b") {
+      const m = s.slice(i).match(/^\u001b\[[0-9;]*m/);
+      if (m) {
+        out += m[0];
+        i += m[0].length - 1;
+        continue;
+      }
+    }
+    out += s[i];
+    vis += 1;
+  }
+  return out + reset + dim("\u2026");
+}
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -151,7 +170,7 @@ function pushEvent(text: string): void {
 
 function box(title: string, lines: string[], width: number): string[] {
   const top = green("┌─ ") + bold(title) + green(" " + "─".repeat(Math.max(0, width - visLen(title) - 5)) + "┐");
-  const body = lines.map((l) => green("│ ") + padEndV(l, width - 4) + green(" │"));
+  const body = lines.map((l) => green("│ ") + padEndV(clipV(l, width - 4), width - 4) + green(" │"));
   const bottom = green("└" + "─".repeat(width - 2) + "┘");
   return [top, ...body, bottom];
 }
@@ -336,7 +355,6 @@ async function scanOnce(
       derivBackdrop = await agentHub.getDerivativesSentiment("BTCUSDT");
       const macro = Math.max(0, Math.min(1, (derivBackdrop.score + 1) / 2));
       indexSupport = 0.7 * indexSupport + 0.3 * macro;
-      newsStatus = `agent hub sentiment skill: live (funding/OI) · per-equity news feed: none configured`;
     } catch (err) {
       pushEvent(yellow(`risk backdrop unavailable: ${(err as Error).message}`));
     }
