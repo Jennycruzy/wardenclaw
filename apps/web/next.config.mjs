@@ -1,3 +1,13 @@
+import { existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Next.js only reads .env files from apps/web/, but the whole monorepo is
+// configured from the root .env (the same file the scripts load via dotenv).
+// Load it here so server code (readDashboardEnv) sees the real config.
+const rootEnv = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".env");
+if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
