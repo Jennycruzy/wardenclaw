@@ -24,7 +24,7 @@ import "dotenv/config";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { emitKeypressEvents } from "node:readline";
-import { AuditLogger, appendMandate } from "@wardenclaw/core";
+import { AuditLogger, appendMandate, createLlmProvider } from "@wardenclaw/core";
 import {
   BitgetPublicMarketData,
   BitgetMcpClient,
@@ -41,6 +41,10 @@ import {
   technicalDirection,
   reactorConfigFromEnv,
   isTickerStale,
+  YahooFinanceNewsFeed,
+  CachedNewsScanner,
+  atrPct,
+  type ScannedNews,
   type AssetPerception,
   type ShockDetection,
   type BitgetAgentConfig,
@@ -127,6 +131,13 @@ let newsStatus =
   "per-equity news feed: not configured — honest absence, sentiment gate stays neutral";
 let lastPrices: Record<string, number> = {};
 let forceScan: (() => void) | null = null;
+const newsByAsset = new Map<string, ScannedNews>();
+const seenHeadlines = new Set<string>();
+const lastBars = new Map<string, BitgetCandle[]>();
+// Command bar (`:` to open): typed command → deterministic action.
+let cmdMode = false;
+let cmdBuf = "";
+let runCommand: (line: string) => Promise<void> = async () => {};
 
 function pushEvent(text: string): void {
   events.push({ time: hhmmss(), text });
@@ -214,6 +225,26 @@ function render(book: PaperBook, executionMode: string, perceptionMode: string):
   } else {
     news.push(dim("derivatives    backdrop unavailable (enable BITGET_AGENT_HUB_MCP=true for funding/OI skill)"));
   }
+  for (const sym of TRADEABLE_XSTOCKS) {
+    const n = newsByAsset.get(sym.display);
+    if (!n) continue;
+    const latest = n.items[0];
+    const dirBadge = !n.event
+      ? gray("·unclassified")
+      : n.event.direction === "positive"
+        ? green(`▲${n.event.direction} ${(n.event.confidence * 100).toFixed(0)}%`)
+        : n.event.direction === "negative"
+          ? red(`▼${n.event.direction} ${(n.event.confidence * 100).toFixed(0)}%`)
+          : yellow(`◆${n.event.direction}`);
+    const ageMin = latest ? Math.max(0, Math.round((Date.now() - Date.parse(latest.publishedAt)) / 60_000)) : 0;
+    news.push(
+      padEndV(bold(sym.display), 7) +
+        padEndV(dirBadge, 16) +
+        (latest
+          ? dim(`"${latest.headline.slice(0, Math.max(20, width - 50))}" · ${ageMin}m ago`)
+          : dim("no headlines in window")),
+    );
+  }
   news.push(dim(newsStatus));
   out.push(...box("NEWS / SENTIMENT SCANNER", news, width - 2));
 
@@ -246,17 +277,29 @@ function render(book: PaperBook, executionMode: string, perceptionMode: string):
   const feed = events.slice(-feedHeight).map((e) => `${dim(e.time)} ${e.text}`);
   out.push(...box("EVENT FEED", feed.length ? feed : [dim("waiting for first scan…")], width - 2));
 
-  // Footer
-  out.push(
-    " " + [
-      `${bold("[space]")} ${paused ? "resume" : "pause"}`,
-      `${bold("[t]")} trading ${tradingEnabled ? green("on") : yellow("off")}`,
-      `${bold("[f]")} scan now`,
-      `${bold("[x]")} close all`,
-      `${bold("[+/-]")} interval`,
-      `${bold("[q]")} quit`,
-    ].join(dim("  ·  ")),
-  );
+  // Footer: command bar when open, shortcut help otherwise.
+  if (cmdMode) {
+    out.push(" " + inverse(green(` : ${cmdBuf}▌ `)));
+    out.push(
+      " " +
+        dim(
+          "commands: buy <SYM> [usd] · close <SYM>|all · news [SYM] · scan · pause · resume · " +
+            "watch · trade · interval <s> · tp <pct> · mag <pct> · hold <bars> · score <n> · help  (esc cancels)",
+        ),
+    );
+  } else {
+    out.push(
+      " " + [
+        `${bold("[:]")} command`,
+        `${bold("[space]")} ${paused ? "resume" : "pause"}`,
+        `${bold("[t]")} trading ${tradingEnabled ? green("on") : yellow("off")}`,
+        `${bold("[f]")} scan now`,
+        `${bold("[x]")} close all`,
+        `${bold("[+/-]")} interval`,
+        `${bold("[q]")} quit`,
+      ].join(dim("  ·  ")),
+    );
+  }
 
   process.stdout.write(`${ESC}H${ESC}2J${ESC}3J` + out.join("\n") + "\n");
 }
@@ -270,6 +313,7 @@ async function scanOnce(
   book: PaperBook,
   reactor: ReturnType<typeof reactorConfigFromEnv>,
   mandatesPath: string,
+  scanner: CachedNewsScanner | null,
 ): Promise<void> {
   scanning = true;
   cycle += 1;
@@ -326,6 +370,36 @@ async function scanOnce(
         st.barsSinceShock += 1;
       }
       shockState.set(sym.display, st);
+      lastBars.set(sym.display, candles);
+
+      // REAL per-equity news for the underlying US stock, classified by the
+      // configured LLM into the reactor's sentiment gate (absent when no LLM).
+      if (scanner) {
+        try {
+          scanningSymbol = `${sym.underlying} news`;
+          const scanned = await scanner.scan(sym.underlying, sym.display);
+          newsByAsset.set(sym.display, scanned);
+          for (const item of scanned.items.slice(0, 2)) {
+            if (seenHeadlines.has(item.id)) continue;
+            seenHeadlines.add(item.id);
+            pushEvent(`${cyan("📰")} ${bold(sym.display)} ${dim(`"${item.headline.slice(0, 90)}"`)}`);
+          }
+          if (scanned.event && scanned.event.direction !== "unknown") {
+            const d = scanned.event.direction;
+            const col = d === "positive" ? green : d === "negative" ? red : yellow;
+            if (scanned.summary && !seenHeadlines.has(`sum:${sym.display}:${scanned.fetchedAt}`)) {
+              seenHeadlines.add(`sum:${sym.display}:${scanned.fetchedAt}`);
+              pushEvent(
+                `${col("◆ sentiment")} ${bold(sym.display)} ${col(d)} ` +
+                  `${(scanned.event.confidence * 100).toFixed(0)}% — ${dim(scanned.summary.slice(0, 80))}`,
+              );
+            }
+          }
+          if (scanner.lastError) pushEvent(yellow(`news classifier degraded: ${scanner.lastError.slice(0, 70)}`));
+        } catch (err) {
+          pushEvent(yellow(`${sym.display} news unavailable: ${(err as Error).message.slice(0, 60)}`));
+        }
+      }
 
       const stale = isTickerStale(ticker, now, STALE_MS);
       const perception: AssetPerception = {
@@ -335,6 +409,7 @@ async function scanOnce(
         armedShock: st.armedShock,
         midPrice: ticker.lastPrice,
         marketDataTimestamp: ticker.timestamp,
+        event: newsByAsset.get(sym.display)?.event,
         indexSupport,
         feedStale: stale,
       };
@@ -346,6 +421,7 @@ async function scanOnce(
         bars: candles,
         barsSinceShock: st.barsSinceShock,
         armedShock: st.armedShock,
+        event: newsByAsset.get(sym.display)?.event,
         technicalDirection: technicalDirection(candles),
         indexSupport,
         currentExposurePct: 0,
@@ -442,6 +518,19 @@ async function main(): Promise<void> {
   };
   const agent = new BitgetReactorAgent(cfg, book, audit, auditPath);
 
+  // Real per-equity news (Yahoo Finance RSS for the underlying) + the existing
+  // LLM layer as classifier. Disable with BITGET_NEWS_FEED=false.
+  let scanner: CachedNewsScanner | null = null;
+  if (process.env.BITGET_NEWS_FEED !== "false") {
+    const llm = createLlmProvider(process.env, process.env.NEWS_SENTIMENT_MODEL || undefined);
+    scanner = new CachedNewsScanner(new YahooFinanceNewsFeed(), llm, {
+      ttlSeconds: Number(process.env.BITGET_NEWS_TTL_SECONDS ?? "300"),
+    });
+    newsStatus = `news: yahoo finance RSS (real headlines) · classifier: ${
+      scanner.classifierEnabled ? llm.name : "disabled — events absent, gates stay deterministic"
+    }`;
+  }
+
   pushEvent(
     dim(
       `thresholds: shock ≥${(reactor.shock.minMagnitudePct * 100).toFixed(1)}% / ${reactor.shock.windowBars} bars ` +
@@ -451,12 +540,152 @@ async function main(): Promise<void> {
   );
   pushEvent(dim(`audit: ${auditPath}`));
 
+  // Command interpreter: deterministic parsing, real execution, full audit.
+  runCommand = async (line: string): Promise<void> => {
+    const [verb, ...args] = line.trim().split(/\s+/);
+    if (!verb) return;
+    const v = verb.toLowerCase();
+    const symArg = (s?: string) =>
+      s ? TRADEABLE_XSTOCKS.find((x) => x.display.toLowerCase() === s.toLowerCase() || x.underlying.toLowerCase() === s.toLowerCase()) : undefined;
+    try {
+      if (v === "help") {
+        pushEvent(dim("buy <SYM> [usd] · close <SYM>|all · news [SYM] · scan · pause · resume · watch · trade · interval <s> · tp <pct> · mag <pct> · hold <bars> · score <n> · status"));
+      } else if (v === "buy") {
+        const sym = symArg(args[0]);
+        if (!sym) return pushEvent(red(`unknown symbol: ${args[0] ?? "(none)"} — try ${TRADEABLE_XSTOCKS.map((s) => s.display).join("/")}`));
+        const price = lastPrices[sym.display];
+        const bars = lastBars.get(sym.display);
+        if (!price || !bars) return pushEvent(red(`no market data for ${sym.display} yet — wait for a scan`));
+        if (book.getPosition(sym.display)) return pushEvent(yellow(`${sym.display} position already open`));
+        const equity = book.equity(lastPrices);
+        const want = args[1] ? Number(args[1]) : 0.1 * equity;
+        if (!Number.isFinite(want) || want <= 0) return pushEvent(red(`bad notional: ${args[1]}`));
+        const notional = Math.min(want, reactor.maxSingleStockPct * equity, book.cash);
+        const stopDistancePct = Math.max(cfg.stopAtrMultiple * atrPct(bars), 0.005);
+        const ts = new Date().toISOString();
+        const fill = book.open({
+          asset: sym.display,
+          refPrice: price,
+          notionalUsd: notional,
+          stopPrice: price * (1 - stopDistancePct),
+          slippageBps: cfg.paperSlippageBps,
+          timestamp: ts,
+          mandateId: `manual-${sym.display}-${ts}`,
+        });
+        await audit.append({
+          timestamp: ts,
+          mandateId: `manual-${sym.display}-${ts}`,
+          stage: "execution",
+          input: { command: line, source: "interactive_console" },
+          output: { status: "filled", fillPrice: fill.fillPrice, notionalUsd: fill.notionalUsd, simulated: true },
+          proofAnchors: { paperFillSource: `${cfg.executionMode}@${ts}` },
+        });
+        pushEvent(green(`◉ MANUAL BUY ${bold(sym.display)} $${fmtUsd(notional)} @ ${fmtUsd(fill.fillPrice)} (stop ${(stopDistancePct * 100).toFixed(1)}% below)`));
+      } else if (v === "close" || v === "sell") {
+        const all = (args[0] ?? "all").toLowerCase() === "all";
+        const targets = all ? book.openPositions() : [book.getPosition(symArg(args[0])?.display ?? "")].filter(Boolean);
+        if (targets.length === 0) return pushEvent(dim("nothing to close"));
+        for (const p of targets) {
+          const t = book.close({
+            asset: p!.asset,
+            refPrice: lastPrices[p!.asset] ?? p!.entryPrice,
+            slippageBps: cfg.paperSlippageBps,
+            timestamp: new Date().toISOString(),
+            reason: "manual",
+          });
+          pushEvent(`${bold("MANUAL EXIT")} ${t.asset} ` + (t.pnlUsd >= 0 ? green(`+$${fmtUsd(t.pnlUsd)}`) : red(`-$${fmtUsd(-t.pnlUsd)}`)));
+        }
+      } else if (v === "news") {
+        if (!scanner) return pushEvent(yellow("news feed disabled (BITGET_NEWS_FEED=false)"));
+        const targets = symArg(args[0]) ? [symArg(args[0])!] : TRADEABLE_XSTOCKS;
+        for (const sym of targets) {
+          const scanned = await scanner.scan(sym.underlying, sym.display, true);
+          newsByAsset.set(sym.display, scanned);
+          pushEvent(`${cyan("📰")} ${bold(sym.display)} ${scanned.items.length} headlines` +
+            (scanned.event ? ` → ${scanned.event.direction} ${(scanned.event.confidence * 100).toFixed(0)}%` : " (unclassified)"));
+        }
+      } else if (v === "scan") {
+        nextScanAt = Date.now();
+        forceScan?.();
+      } else if (v === "pause") {
+        paused = true;
+        pushEvent(yellow("scanning paused"));
+      } else if (v === "resume") {
+        paused = false;
+        pushEvent(green("scanning resumed"));
+      } else if (v === "watch") {
+        tradingEnabled = false;
+        pushEvent(yellow("watch-only mode"));
+      } else if (v === "trade") {
+        tradingEnabled = true;
+        pushEvent(green("trading ENABLED (paper)"));
+      } else if (v === "interval") {
+        const n = Number(args[0]);
+        if (!Number.isFinite(n) || n < 10) return pushEvent(red("usage: interval <seconds ≥10>"));
+        pollSeconds = Math.min(600, Math.round(n));
+        pushEvent(dim(`poll interval → ${pollSeconds}s`));
+      } else if (v === "tp" || v === "mag") {
+        const n = Number(args[0]);
+        if (!Number.isFinite(n) || n <= 0 || n > 20) return pushEvent(red(`usage: ${v} <percent, e.g. 1.5>`));
+        if (v === "tp") reactor.takeProfitPct = n / 100;
+        else reactor.shock.minMagnitudePct = n / 100;
+        pushEvent(green(`${v === "tp" ? "take-profit" : "shock magnitude"} → ${n}%`));
+      } else if (v === "hold") {
+        const n = Number(args[0]);
+        if (!Number.isFinite(n) || n < 1) return pushEvent(red("usage: hold <bars>"));
+        reactor.maxHoldBars = Math.round(n);
+        pushEvent(green(`max hold → ${reactor.maxHoldBars} bars`));
+      } else if (v === "score") {
+        const n = Number(args[0]);
+        if (!Number.isFinite(n) || n < 0 || n > 100) return pushEvent(red("usage: score <0-100>"));
+        reactor.minEntryScore = Math.round(n);
+        pushEvent(green(`entry score threshold → ${reactor.minEntryScore}`));
+      } else if (v === "status") {
+        pushEvent(dim(
+          `shock ≥${(reactor.shock.minMagnitudePct * 100).toFixed(1)}% · vol ≥${reactor.shock.minVolumeRatio}× · ` +
+            `cooldown ${reactor.cooldownBars} · score ≥${reactor.minEntryScore} · tp +${((reactor.takeProfitPct ?? 0) * 100).toFixed(1)}% · ` +
+            `hold ${reactor.maxHoldBars} bars · poll ${pollSeconds}s · ${tradingEnabled ? "trading" : "watch-only"}`,
+        ));
+      } else {
+        pushEvent(red(`unknown command: ${verb} — type 'help'`));
+      }
+    } catch (err) {
+      pushEvent(red(`command failed: ${(err as Error).message}`));
+    }
+  };
+
   // Keyboard
   if (process.stdin.isTTY) {
     emitKeypressEvents(process.stdin);
     process.stdin.setRawMode(true);
-    process.stdin.on("keypress", (_str: string, key: { name?: string; ctrl?: boolean }) => {
+    process.stdin.on("keypress", (_str: string, key: { name?: string; ctrl?: boolean; sequence?: string }) => {
       if (!key) return;
+      if (key.ctrl && key.name === "c") {
+        quitting = true;
+        return;
+      }
+      // Command-bar input mode captures all keys until enter/escape.
+      if (cmdMode) {
+        if (key.name === "return" || key.name === "enter") {
+          const line = cmdBuf;
+          cmdMode = false;
+          cmdBuf = "";
+          if (line.trim()) void runCommand(line);
+        } else if (key.name === "escape") {
+          cmdMode = false;
+          cmdBuf = "";
+        } else if (key.name === "backspace") {
+          cmdBuf = cmdBuf.slice(0, -1);
+        } else if (_str && _str >= " " && _str.length === 1) {
+          cmdBuf += _str;
+        }
+        return;
+      }
+      if (_str === ":") {
+        cmdMode = true;
+        cmdBuf = "";
+        return;
+      }
       if (key.name === "q" || (key.ctrl && key.name === "c")) {
         quitting = true;
       } else if (key.name === "space" || key.name === "p") {
@@ -507,7 +736,7 @@ async function main(): Promise<void> {
   while (!quitting) {
     if (!paused && Date.now() >= nextScanAt) {
       try {
-        await scanOnce(md, agentHub, agent, book, reactor, mandatesPath);
+        await scanOnce(md, agentHub, agent, book, reactor, mandatesPath, scanner);
       } catch (err) {
         scanning = false;
         nextScanAt = Date.now() + pollSeconds * 1000;

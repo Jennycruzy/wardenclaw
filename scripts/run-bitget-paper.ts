@@ -21,7 +21,7 @@ import "dotenv/config";
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { AuditLogger, appendMandate } from "@wardenclaw/core";
+import { AuditLogger, appendMandate, createLlmProvider } from "@wardenclaw/core";
 import {
   BitgetPublicMarketData,
   BitgetMcpClient,
@@ -41,6 +41,8 @@ import {
   reactorConfigFromEnv,
   isTickerStale,
   selectExecutionMode,
+  YahooFinanceNewsFeed,
+  CachedNewsScanner,
   type AssetPerception,
   type ShockDetection,
   type BitgetAgentConfig,
@@ -134,6 +136,23 @@ async function main(): Promise<void> {
   });
   const state = new Map<string, ShockState>();
 
+  // Real per-equity news (Yahoo Finance RSS for the underlying US stock),
+  // classified by the configured LLM into the reactor's sentiment gate.
+  // Disable with BITGET_NEWS_FEED=false; without an LLM the event is simply
+  // absent and the deterministic gates run alone (honest absence).
+  let newsScanner: CachedNewsScanner | null = null;
+  if (process.env.BITGET_NEWS_FEED !== "false") {
+    const llm = createLlmProvider(process.env, process.env.NEWS_SENTIMENT_MODEL || undefined);
+    newsScanner = new CachedNewsScanner(new YahooFinanceNewsFeed(), llm, {
+      ttlSeconds: Number(process.env.BITGET_NEWS_TTL_SECONDS ?? "300"),
+    });
+    console.log(
+      `[bitget] news feed: yahoo_finance_rss · classifier: ${
+        newsScanner.classifierEnabled ? llm.name : "disabled (no event, deterministic gates only)"
+      }`,
+    );
+  }
+
   for (let cycle = 0; cycle < cycles; cycle++) {
     // Index support from the proxies (QQQx/SPYx) — real data only.
     let indexSupport = 0.5;
@@ -180,6 +199,25 @@ async function main(): Promise<void> {
         }
         state.set(sym.display, st);
 
+        let event;
+        if (newsScanner) {
+          try {
+            const scanned = await newsScanner.scan(sym.underlying, sym.display);
+            event = scanned.event;
+            if (scanned.items.length > 0) {
+              console.log(
+                `[bitget] ${sym.display} news: ${scanned.items.length} real headlines` +
+                  (event ? ` → ${event.direction} (${(event.confidence * 100).toFixed(0)}%)` : " (unclassified)"),
+              );
+            }
+            if (newsScanner.lastError) {
+              console.warn(`[bitget] news classifier degraded: ${newsScanner.lastError}`);
+            }
+          } catch (err) {
+            console.warn(`[bitget] ${sym.display} news unavailable: ${(err as Error).message}`);
+          }
+        }
+
         perceptions.push({
           asset: sym.display,
           bars: candles,
@@ -187,6 +225,7 @@ async function main(): Promise<void> {
           armedShock: st.armedShock,
           midPrice: ticker.lastPrice,
           marketDataTimestamp: ticker.timestamp,
+          event,
           indexSupport,
           feedStale: isTickerStale(ticker, now, STALE_MS),
         });

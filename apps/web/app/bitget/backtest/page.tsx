@@ -61,7 +61,9 @@ export default function BacktestPage() {
           <SectionTitle title="Trades" />
           {report.trades.length === 0 ? (
             <p className="py-8 text-center text-xs text-ink-faint">
-              No trades — the reactor found no confirmed continuation to enter.
+              No trades in this window — the calibrated shock threshold is deliberately
+              selective and this symbol printed no qualifying shock. The reactor refusing
+              to trade here is the discipline working, not an error.
             </p>
           ) : (
             <div className="overflow-x-auto">

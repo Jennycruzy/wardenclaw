@@ -72,7 +72,10 @@ pnpm run:bitget-paper
 BITGET_CYCLES=10 BITGET_POLL_SECONDS=60 pnpm run:bitget-paper
 
 # Interactive live console — full-screen scanner cockpit with keyboard control
-# ([space] pause, [t] trading on/off, [f] scan now, [x] close all, [q] quit)
+# ([space] pause, [t] trading on/off, [f] scan now, [x] close all, [q] quit) and
+# a `:` command bar (buy/close/news/tp/mag/hold/score/interval — type :help).
+# Real per-equity news (Yahoo Finance RSS for each underlying) is fetched live
+# and classified by the configured LLM into the reactor's sentiment gate.
 pnpm console:bitget
 
 # Backtest the reactor (real symbol, or synthetic fallback if unavailable)
