@@ -6,7 +6,7 @@
  */
 
 import "server-only";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   parseMandate,
@@ -31,6 +31,41 @@ function findRepoRoot(): string {
 const ROOT = findRepoRoot();
 const AUDIT_DIR = join(ROOT, "data", "audit");
 const BACKTEST_DIR = join(ROOT, "data", "backtests");
+const RUNTIME_DIR = join(ROOT, "data", "runtime");
+const LIVE_STATE_PATH = join(RUNTIME_DIR, "bitget-live.json");
+const COMMAND_QUEUE_PATH = join(RUNTIME_DIR, "bitget-commands.jsonl");
+
+// ---- Live console bridge ----------------------------------------------------
+// The interactive console (pnpm console:bitget) publishes its state to
+// data/runtime/bitget-live.json and consumes commands appended to
+// bitget-commands.jsonl. These helpers are the dashboard's side of the bridge.
+
+/** Verbs the dashboard may queue — mirrors the console's command interpreter. */
+export const LIVE_COMMAND_VERBS = [
+  "help", "buy", "close", "sell", "news", "scan", "pause", "resume",
+  "watch", "trade", "interval", "tp", "mag", "hold", "score", "status",
+] as const;
+
+export function loadBitgetLive(): Record<string, unknown> | null {
+  if (!existsSync(LIVE_STATE_PATH)) return null;
+  try {
+    return JSON.parse(readFileSync(LIVE_STATE_PATH, "utf8")) as Record<string, unknown>;
+  } catch {
+    return null; // torn read between writes; the client polls again shortly
+  }
+}
+
+export function queueBitgetCommand(line: string): { id: number } | { error: string } {
+  const cleaned = line.trim().replace(/^[:/]+/, "").slice(0, 120);
+  const verb = cleaned.split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (!(LIVE_COMMAND_VERBS as readonly string[]).includes(verb)) {
+    return { error: `unknown command "${verb}" — allowed: ${LIVE_COMMAND_VERBS.join(", ")}` };
+  }
+  mkdirSync(RUNTIME_DIR, { recursive: true });
+  const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+  appendFileSync(COMMAND_QUEUE_PATH, JSON.stringify({ id, line: cleaned, queuedAt: new Date().toISOString() }) + "\n");
+  return { id };
+}
 
 function listFiles(dir: string, suffix: string): string[] {
   if (!existsSync(dir)) return [];

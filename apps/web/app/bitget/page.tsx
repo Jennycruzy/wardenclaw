@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Shell } from "@/components/shell";
+import { LiveConsole } from "@/components/live-console";
 import { Badge, Card, Dot, EmptyState, Stat, SectionTitle } from "@/components/ui";
 import { ExecutionStatusChip, SignalFamilyChip } from "@/components/chips";
 import { RejectionBars } from "@/components/charts";
@@ -49,6 +50,8 @@ export default function BitgetOverview() {
         <Stat label="Disciplined skips" value={num(stats.rejected)} valueClass="text-neg" sub="gated rejections" />
         <Stat label="Watching" value={num(stats.watching)} sub="armed / cooldown" />
       </div>
+
+      <LiveConsole />
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-2">

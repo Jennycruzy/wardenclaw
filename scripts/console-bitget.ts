@@ -21,7 +21,7 @@
 
 import "dotenv/config";
 
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emitKeypressEvents } from "node:readline";
 import { AuditLogger, appendMandate, createLlmProvider } from "@wardenclaw/core";
@@ -157,6 +157,14 @@ const lastBars = new Map<string, BitgetCandle[]>();
 let cmdMode = false;
 let cmdBuf = "";
 let runCommand: (line: string) => Promise<void> = async () => {};
+
+// Web-dashboard bridge: the console publishes its live state to a JSON file
+// the Next.js dashboard reads, and consumes commands the dashboard queues.
+const RUNTIME_DIR = join(process.cwd(), "data", "runtime");
+const LIVE_STATE_PATH = join(RUNTIME_DIR, "bitget-live.json");
+const COMMAND_QUEUE_PATH = join(RUNTIME_DIR, "bitget-commands.jsonl");
+let lastCommandId = 0;
+let publishLiveState: () => void = () => {};
 
 function pushEvent(text: string): void {
   events.push({ time: hhmmss(), text });
@@ -560,7 +568,8 @@ async function main(): Promise<void> {
 
   // Command interpreter: deterministic parsing, real execution, full audit.
   runCommand = async (line: string): Promise<void> => {
-    const [verb, ...args] = line.trim().split(/\s+/);
+    // Accept ":buy", "/buy", and "buy" alike (terminal bar and web box).
+    const [verb, ...args] = line.trim().replace(/^[:/]+/, "").split(/\s+/);
     if (!verb) return;
     const v = verb.toLowerCase();
     const symArg = (s?: string) =>
@@ -670,6 +679,128 @@ async function main(): Promise<void> {
     } catch (err) {
       pushEvent(red(`command failed: ${(err as Error).message}`));
     }
+    publishLiveState();
+  };
+
+  // Publish the console's full live state for the web dashboard. Written
+  // atomically so the reader never sees a torn file.
+  mkdirSync(RUNTIME_DIR, { recursive: true });
+  publishLiveState = () => {
+    try {
+      const state = {
+        running: true,
+        updatedAt: new Date().toISOString(),
+        cycle,
+        paused,
+        tradingEnabled,
+        pollSeconds,
+        scanning,
+        scanningSymbol,
+        perception: md.mode,
+        executionMode: cfg.executionMode,
+        thresholds: {
+          shockMinMagnitudePct: reactor.shock.minMagnitudePct,
+          shockMinVolumeRatio: reactor.shock.minVolumeRatio,
+          shockWindowBars: reactor.shock.windowBars,
+          cooldownBars: reactor.cooldownBars,
+          minEntryScore: reactor.minEntryScore,
+          takeProfitPct: reactor.takeProfitPct ?? null,
+          maxHoldBars: reactor.maxHoldBars ?? null,
+        },
+        indexSupport,
+        indexSupportSource,
+        derivatives: derivBackdrop
+          ? {
+              regime: derivBackdrop.regime,
+              score: derivBackdrop.score,
+              fundingRate: derivBackdrop.fundingRate,
+              openInterest: derivBackdrop.openInterest,
+            }
+          : null,
+        newsStatus: stripAnsi(newsStatus),
+        symbols: TRADEABLE_XSTOCKS.map((s) => {
+          const r = rows.get(s.display);
+          const n = newsByAsset.get(s.display);
+          return {
+            symbol: s.display,
+            bitgetSymbol: s.bitgetSymbol,
+            price: r?.price ?? null,
+            change24hPct: r?.change24hPct ?? null,
+            volumeRatio: r?.shock?.volumeRatio ?? null,
+            movePct: r?.shock ? r.shock.magnitudePct * 100 : null,
+            state: r ? stripAnsi(r.state) : "awaiting first scan",
+            detail: r ? stripAnsi(r.detail) : "",
+            error: r?.error ?? null,
+            news: n
+              ? {
+                  fetchedAt: n.fetchedAt,
+                  event: n.event ?? null,
+                  summary: n.summary ?? null,
+                  headlines: n.items.slice(0, 3).map((i) => ({
+                    headline: i.headline,
+                    url: i.url ?? null,
+                    publishedAt: i.publishedAt,
+                  })),
+                }
+              : null,
+          };
+        }),
+        book: {
+          equityUsd: book.equity(lastPrices),
+          cashUsd: book.cash,
+          positions: book.openPositions().map((p) => ({
+            asset: p.asset,
+            entryPrice: p.entryPrice,
+            quantity: p.quantity,
+            notionalUsd: p.notionalUsd,
+            stopPrice: p.stopPrice,
+            markPrice: lastPrices[p.asset] ?? p.entryPrice,
+            openedAt: p.openedAt,
+          })),
+          closedTrades: book.closedTrades().slice(-10).reverse(),
+        },
+        events: events.slice(-30).map((e) => ({ time: e.time, text: stripAnsi(e.text) })),
+        lastCommandId,
+      };
+      const tmp = `${LIVE_STATE_PATH}.tmp`;
+      writeFileSync(tmp, JSON.stringify(state));
+      renameSync(tmp, LIVE_STATE_PATH);
+    } catch {
+      // Publishing is best-effort; the terminal console must never die over it.
+    }
+  };
+
+  // Consume commands queued by the web dashboard. On startup, skip anything
+  // already in the file — stale commands must not replay into a fresh book.
+  const readQueuedCommands = (): Array<{ id: number; line: string }> => {
+    if (!existsSync(COMMAND_QUEUE_PATH)) return [];
+    return readFileSync(COMMAND_QUEUE_PATH, "utf8")
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => {
+        try {
+          return JSON.parse(l) as { id: number; line: string };
+        } catch {
+          return null;
+        }
+      })
+      .filter((c): c is { id: number; line: string } => Boolean(c && typeof c.id === "number" && typeof c.line === "string"));
+  };
+  lastCommandId = readQueuedCommands().reduce((m, c) => Math.max(m, c.id), 0);
+  let pollingCommands = false;
+  const pollWebCommands = async (): Promise<void> => {
+    if (pollingCommands) return;
+    pollingCommands = true;
+    try {
+      for (const c of readQueuedCommands()) {
+        if (c.id <= lastCommandId) continue;
+        lastCommandId = c.id;
+        pushEvent(cyan(`▸ web command: ${c.line.slice(0, 60)}`));
+        await runCommand(c.line.slice(0, 120));
+      }
+    } finally {
+      pollingCommands = false;
+    }
   };
 
   // Keyboard
@@ -751,6 +882,7 @@ async function main(): Promise<void> {
   }, scanning ? 120 : 500);
 
   // Scan loop
+  let lastPublishAt = 0;
   while (!quitting) {
     if (!paused && Date.now() >= nextScanAt) {
       try {
@@ -760,6 +892,12 @@ async function main(): Promise<void> {
         nextScanAt = Date.now() + pollSeconds * 1000;
         pushEvent(red(`cycle failed: ${(err as Error).message}`));
       }
+      publishLiveState();
+    }
+    await pollWebCommands();
+    if (Date.now() - lastPublishAt > 3000) {
+      lastPublishAt = Date.now();
+      publishLiveState();
     }
     await new Promise<void>((resolve) => {
       forceScan = resolve;
@@ -768,6 +906,11 @@ async function main(): Promise<void> {
   }
 
   clearInterval(renderTimer);
+  try {
+    writeFileSync(LIVE_STATE_PATH, JSON.stringify({ running: false, updatedAt: new Date().toISOString() }));
+  } catch {
+    // best-effort
+  }
   if (process.stdin.isTTY) process.stdin.setRawMode(false);
   process.stdout.write(`${ESC}0m\n`);
   console.log(`[console] audit trail: ${auditPath}`);
