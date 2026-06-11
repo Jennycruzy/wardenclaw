@@ -111,3 +111,83 @@ describe("BitgetReactorAgent cycle", () => {
     }
   });
 });
+
+describe("BitgetReactorAgent in official demo mode", () => {
+  it("executes through the demo executor and anchors the real order id", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wardenclaw-bitget-demo-"));
+    const auditPath = join(dir, "audit.jsonl");
+    try {
+      const book = new PaperBook(10_000);
+      const audit = new AuditLogger(auditPath);
+      const cfg: BitgetAgentConfig = {
+        ...DEFAULT_BITGET_AGENT_CONFIG,
+        executionMode: "official_bitget_demo",
+        compiledStrategy: {},
+      };
+      const buys: Array<Record<string, unknown>> = [];
+      const demoExecutor = {
+        async marketBuy(args: { symbol: string; quoteNotionalUsd: number; clientOid?: string }) {
+          buys.push({ ...args });
+          return {
+            orderId: "demo-o1",
+            clientOid: args.clientOid,
+            symbol: args.symbol,
+            side: "buy" as const,
+            status: "filled" as const,
+            fills: [
+              { tradeId: "t1", price: 106.1, size: args.quoteNotionalUsd / 106.1, amount: args.quoteNotionalUsd, timestamp: "2026-06-01T00:05:01Z" },
+            ],
+            avgFillPrice: 106.1,
+            filledQuantity: args.quoteNotionalUsd / 106.1,
+            filledQuoteUsd: args.quoteNotionalUsd,
+            placedAt: "2026-06-01T00:05:01Z",
+            source: "official_bitget_demo" as const,
+            demoTrading: true as const,
+          };
+        },
+        async marketSell() {
+          throw new Error("not used in this test");
+        },
+      };
+      let n = 0;
+      const now = () => new Date(Date.UTC(2026, 5, 1, 0, 0, n++)).toISOString();
+      const agent = new BitgetReactorAgent(cfg, book, audit, auditPath, now, {
+        demoExecutor,
+        symbolFor: () => "NVDAONUSDT",
+      });
+
+      const result = await agent.runCycle([confirmedPerception("NVDAx")]);
+      expect(result.executedAsset).toBe("NVDAx");
+      const m = result.mandates[0]!;
+      expect(() => parseMandate(m)).not.toThrow();
+      expect(m.execution.status).toBe("filled");
+      expect(m.execution.adapter).toBe("official_bitget_demo");
+      expect(m.execution.paperFill).toBeUndefined();
+      expect((m.execution.finalOrder as Record<string, unknown>).orderId).toBe("demo-o1");
+      expect(m.proofAnchors.bitgetRequestId).toBe("demo-o1");
+      expect(m.proofAnchors.paperFillSource).toBeUndefined();
+      expect(buys[0]).toMatchObject({ symbol: "NVDAONUSDT" });
+      // Book mirrors the REAL fill at the demo fill price for tracking.
+      expect(book.getPosition("NVDAx")?.entryPrice).toBeCloseTo(106.1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to construct demo mode without an executor (never silently paper-fills)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wardenclaw-bitget-demo-"));
+    const auditPath = join(dir, "audit.jsonl");
+    try {
+      const cfg: BitgetAgentConfig = {
+        ...DEFAULT_BITGET_AGENT_CONFIG,
+        executionMode: "official_bitget_demo",
+        compiledStrategy: {},
+      };
+      expect(
+        () => new BitgetReactorAgent(cfg, new PaperBook(10_000), new AuditLogger(auditPath), auditPath),
+      ).toThrow(/requires a DemoSpotExecutor/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

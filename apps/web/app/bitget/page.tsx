@@ -26,8 +26,14 @@ export default function BitgetOverview() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">
-            <Dot tone="accent" /> Internal paper engine
+            <Dot tone="accent" />{" "}
+            {env.bitgetExecutionMode === "official_bitget_demo"
+              ? "Official Bitget demo"
+              : "Internal paper engine"}
           </Badge>
+          {env.bitgetDemoMissing.length > 0 && (
+            <Badge tone="warn">demo creds missing: {env.bitgetDemoMissing.join(", ")}</Badge>
+          )}
           <Badge tone={env.llmEnabled ? "pos" : "neutral"}>
             LLM: {env.llmEnabled ? env.llmProvider : "disabled (deterministic)"}
           </Badge>

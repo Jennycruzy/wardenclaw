@@ -10,6 +10,7 @@ export * from "./reactor.js";
 export * from "./eventShockRanker.js";
 export * from "./paperEngine.js";
 export * from "./executionAdapter.js";
+export * from "./demoExecutor.js";
 export * from "./riskGate.js";
 export * from "./agents.js";
 export * from "./backtestReactor.js";

@@ -6,8 +6,9 @@
  *   2. Internal paper engine fed by real Bitget market data.
  *   3. Backtest.
  * Internal paper fills are never presented as Bitget exchange fills; the chosen
- * mode is always surfaced. The official-demo adapter is intentionally not
- * implemented (unverified) and throws a clear TODO if selected.
+ * mode is always surfaced. The official-demo adapter lives in demoExecutor.ts:
+ * it trades Bitget's real Demo Trading environment via the Agent Hub MCP server
+ * (--paper-trading) and activates only with a complete Demo API credential set.
  */
 
 import type { BitgetExecutionMode } from "./types.js";
@@ -40,21 +41,6 @@ export function selectExecutionMode(input: SelectExecutionInput): ExecutionAdapt
     reason:
       "official Bitget demo not verified — using internal paper engine on real Bitget market data",
   };
-}
-
-/**
- * The official Bitget demo executor is NOT implemented because the endpoints are
- * unverified in this environment. Selecting it without a real implementation
- * fails loudly rather than silently falling back to fabricated fills.
- */
-export class OfficialBitgetDemoExecutor {
-  open(): never {
-    throw new Error(
-      "Official Bitget demo execution is not implemented (endpoints unverified). " +
-        "Verify the Bitget demo trading API and implement this adapter, or run with " +
-        "the internal paper engine (BITGET_EXECUTION_MODE=internal_paper_engine).",
-    );
-  }
 }
 
 /** The internal paper executor is simply a PaperBook with the mode attached. */

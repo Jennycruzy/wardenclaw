@@ -31,6 +31,10 @@ import {
   BitgetReactorAgent,
   PaperBook,
   DEFAULT_BITGET_AGENT_CONFIG,
+  OfficialBitgetDemoExecutor,
+  demoCredentialsFromEnv,
+  missingDemoCredentials,
+  findXStock,
   TRADEABLE_XSTOCKS,
   INDEX_PROXIES,
   detectShock,
@@ -84,11 +88,41 @@ async function main(): Promise<void> {
   const audit = new AuditLogger(auditPath);
   const book = new PaperBook(10_000);
 
-  const mode = selectExecutionMode({ officialDemoVerified: false, backtest: false });
+  // Official Bitget Demo Trading (§4.3 priority 1): activates only when the env
+  // requests it AND the full Demo Trading API credential set is present.
+  const wantOfficialDemo = process.env.BITGET_EXECUTION_MODE === "official_bitget_demo";
+  const demoCreds = demoCredentialsFromEnv();
+  if (wantOfficialDemo && !demoCreds) {
+    console.error(
+      `[bitget] BITGET_EXECUTION_MODE=official_bitget_demo but missing: ` +
+        `${missingDemoCredentials().join(", ")}. Create a Demo Trading API key in ` +
+        `Bitget's demo-trading section and set all three. Falling back to the ` +
+        `internal paper engine (clearly labeled) for this run.`,
+    );
+  }
+  const officialDemoVerified = wantOfficialDemo && Boolean(demoCreds);
+  const mode = selectExecutionMode({ officialDemoVerified, backtest: false });
   console.log(`[bitget] execution mode: ${mode.mode} — ${mode.reason}`);
 
-  const cfg: BitgetAgentConfig = { ...DEFAULT_BITGET_AGENT_CONFIG, compiledStrategy: {} };
-  const agent = new BitgetReactorAgent(cfg, book, audit, auditPath);
+  let demoClient: BitgetMcpClient | undefined;
+  let demoExecutor: OfficialBitgetDemoExecutor | undefined;
+  if (mode.mode === "official_bitget_demo") {
+    ({ executor: demoExecutor, client: demoClient } = OfficialBitgetDemoExecutor.spawn(demoCreds));
+  }
+
+  const cfg: BitgetAgentConfig = {
+    ...DEFAULT_BITGET_AGENT_CONFIG,
+    executionMode: mode.mode,
+    compiledStrategy: {},
+  };
+  const agent = new BitgetReactorAgent(cfg, book, audit, auditPath, undefined, {
+    demoExecutor,
+    symbolFor: (asset) => {
+      const sym = findXStock(asset);
+      if (!sym) throw new Error(`no Bitget symbol mapping for ${asset}`);
+      return sym.bitgetSymbol;
+    },
+  });
   const state = new Map<string, ShockState>();
 
   for (let cycle = 0; cycle < cycles; cycle++) {
@@ -178,6 +212,7 @@ async function main(): Promise<void> {
   console.log(`[bitget] audit trail: ${auditPath}`);
   console.log(`[bitget] mandates:    ${mandatesPath}`);
   await mcpClient?.stop();
+  await demoClient?.stop();
 }
 
 main().catch((err) => {

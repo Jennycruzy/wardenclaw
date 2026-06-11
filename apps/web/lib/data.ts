@@ -283,15 +283,26 @@ export interface DashboardEnv {
   llmEnabled: boolean;
   llmProvider: string;
   agentHubConfigured: boolean;
+  /** Resolved Bitget execution mode (mirrors the run script's selection). */
+  bitgetExecutionMode: "official_bitget_demo" | "internal_paper_engine";
+  /** Demo Trading credential vars still missing (empty = complete). */
+  bitgetDemoMissing: string[];
 }
 
 export function readDashboardEnv(): DashboardEnv {
   const provider = process.env.LLM_PROVIDER ?? (process.env.ANTHROPIC_API_KEY ? "anthropic" : "disabled");
+  const demoMissing = ["BITGET_API_KEY", "BITGET_API_SECRET", "BITGET_API_PASSPHRASE"].filter(
+    (v) => !process.env[v],
+  );
+  const wantsDemo = process.env.BITGET_EXECUTION_MODE === "official_bitget_demo";
   return {
     llmEnabled: process.env.LLM_ENABLED !== "false" && provider !== "disabled",
     llmProvider: provider,
     agentHubConfigured:
       process.env.BITGET_AGENT_HUB_MCP === "true" ||
       Boolean(process.env.BITGET_AGENT_HUB_BASE_URL),
+    bitgetExecutionMode:
+      wantsDemo && demoMissing.length === 0 ? "official_bitget_demo" : "internal_paper_engine",
+    bitgetDemoMissing: demoMissing,
   };
 }

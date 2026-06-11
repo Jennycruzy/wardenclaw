@@ -21,6 +21,11 @@ export interface BitgetMcpOptions {
   modules?: string;
   /** Read-only mode disables every write/order tool (default true). */
   readOnly?: boolean;
+  /**
+   * Bitget Demo Trading mode: every request carries the `paptrading: 1` header.
+   * Requires a Demo Trading API key. Used by the official demo executor.
+   */
+  paperTrading?: boolean;
   /** Launch command (default "npx"). */
   bin?: string;
   /** Override the full argv after `bin` (default derived from the options). */
@@ -71,6 +76,7 @@ export class BitgetMcpClient {
           "-y",
           "bitget-mcp-server",
           ...(this.opts.readOnly === false ? [] : ["--read-only"]),
+          ...(this.opts.paperTrading ? ["--paper-trading"] : []),
           "--modules",
           this.opts.modules ?? "spot,futures",
         ];

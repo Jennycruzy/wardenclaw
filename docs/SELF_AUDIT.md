@@ -32,7 +32,8 @@ silently dropped.
 | 1 | Signal Mandate primitive | implemented | `types.ts`, `signalMandate.ts`, tests |
 | 2 | Submission split | implemented | Bitget-only adapter; BNB-only adapters; no cross-contamination |
 | 3.1–3.9 | Core engine pieces | implemented | `packages/core/*` + tests (85) |
-| 4.x | Bitget build + dashboard | implemented | `packages/bitget-adapter` (38 tests), `/bitget/*` |
+| 4.x | Bitget build + dashboard | implemented | `packages/bitget-adapter` (59 tests), `/bitget/*` |
+| 4.3 | Official Bitget demo execution (priority 1) | implemented | `demoExecutor.ts` — real orders via Agent Hub MCP `--paper-trading` (verified tool surface: spot_place_order/spot_get_fills); activates only with a complete Demo Trading API key set, else falls back loudly to the labeled internal paper engine |
 | 5.1–5.4a | BSC agent, TWAK sole executor, refusal demo | implemented | `bnb-agent`, `twak-adapter` (real `CliTwakExecutor` → `@trustwallet/cli`, tested via subprocess), `scripts/demo-twak-refusal.ts` |
 | 5.x live reads | Real PancakeSwap reserves/quotes/gas (viem) | implemented | `bsc-adapter/liveQuoter.ts` — `LiveBscReader` verified against BSC mainnet (`liveQuoter.test.ts`); wired into worker + dry run |
 | 5.5 | CMC Agent Hub multi-tool + attribution | implemented | real quotes/trending/fear-greed clients + per-mandate attribution + real x402 (USDC/Base) in the loop; `cmc-adapter/*`, tests |

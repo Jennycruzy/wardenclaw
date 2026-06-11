@@ -33,6 +33,7 @@ import { rankShocks, type ShockCandidate } from "./eventShockRanker.js";
 import { evaluatePaperRiskGate } from "./riskGate.js";
 import { PaperBook } from "./paperEngine.js";
 import { atrPct, technicalDirection } from "./indicators.js";
+import type { DemoSpotExecutor, DemoOrderResult } from "./demoExecutor.js";
 
 /** Per-asset real perception for a cycle. */
 export interface AssetPerception {
@@ -130,6 +131,13 @@ function sizePaperPosition(args: {
   return { notionalUsd, stopDistancePct, stopPrice };
 }
 
+export interface BitgetAgentExecutionWiring {
+  /** Real Demo Trading executor; required when executionMode is official_bitget_demo. */
+  demoExecutor?: DemoSpotExecutor;
+  /** Maps a display asset (e.g. "NVDAx") to its Bitget API symbol. */
+  symbolFor?: (asset: string) => string;
+}
+
 export class BitgetReactorAgent {
   constructor(
     private readonly cfg: BitgetAgentConfig,
@@ -137,7 +145,15 @@ export class BitgetReactorAgent {
     private readonly audit: AuditLogger,
     private readonly auditPath: string,
     private readonly now: () => string = () => new Date().toISOString(),
-  ) {}
+    private readonly wiring: BitgetAgentExecutionWiring = {},
+  ) {
+    if (cfg.executionMode === "official_bitget_demo" && (!wiring.demoExecutor || !wiring.symbolFor)) {
+      throw new Error(
+        "executionMode=official_bitget_demo requires a DemoSpotExecutor and a symbol " +
+          "resolver — refusing to run a demo-labeled agent that would paper-fill internally.",
+      );
+    }
+  }
 
   /** Evaluate every asset, rank the confirmed entries, execute the top one. */
   async runCycle(perceptions: AssetPerception[]): Promise<CycleResult> {
@@ -193,7 +209,8 @@ export class BitgetReactorAgent {
   ): Promise<SignalMandate> {
     const ts = this.now();
     const id = mandateId(perception.asset, ts);
-    const paperFillSource = `internal_paper_engine@${perception.marketDataTimestamp}`;
+    const isDemo = this.cfg.executionMode === "official_bitget_demo";
+    const paperFillSource = `${this.cfg.executionMode}@${perception.marketDataTimestamp}`;
 
     // Stage: perception.
     await this.audit.append({
@@ -288,20 +305,48 @@ export class BitgetReactorAgent {
       },
     });
 
-    // Execution (paper).
+    // Execution: official Bitget Demo Trading when wired, else internal paper.
     let status: SignalMandate["execution"]["status"] = "not_submitted";
     let paperFill: Record<string, unknown> | undefined;
+    let demoOrder: DemoOrderResult | undefined;
+    let executionError: string | undefined;
     if (shouldExecute) {
-      const fill = this.book.open({
-        asset: perception.asset,
-        refPrice: perception.midPrice,
-        notionalUsd: sizing.notionalUsd,
-        stopPrice: sizing.stopPrice,
-        slippageBps: this.cfg.paperSlippageBps,
-        timestamp: ts,
-      });
-      status = "filled";
-      paperFill = { ...fill };
+      if (isDemo) {
+        try {
+          demoOrder = await this.wiring.demoExecutor!.marketBuy({
+            symbol: this.wiring.symbolFor!(perception.asset),
+            quoteNotionalUsd: Number(sizing.notionalUsd.toFixed(2)),
+            clientOid: id,
+          });
+          status = demoOrder.status;
+          if (demoOrder.status === "filled") {
+            // Mirror the REAL demo fill into the book so equity/exposure/watchdog
+            // tracking stays consistent. The authoritative record is demoOrder.
+            this.book.open({
+              asset: perception.asset,
+              refPrice: demoOrder.avgFillPrice ?? perception.midPrice,
+              notionalUsd: demoOrder.filledQuoteUsd,
+              stopPrice: sizing.stopPrice,
+              slippageBps: 0,
+              timestamp: ts,
+            });
+          }
+        } catch (err) {
+          status = "failed";
+          executionError = (err as Error).message;
+        }
+      } else {
+        const fill = this.book.open({
+          asset: perception.asset,
+          refPrice: perception.midPrice,
+          notionalUsd: sizing.notionalUsd,
+          stopPrice: sizing.stopPrice,
+          slippageBps: this.cfg.paperSlippageBps,
+          timestamp: ts,
+        });
+        status = "filled";
+        paperFill = { ...fill };
+      }
     } else if (decision.action !== "enter_long") {
       status = "rejected";
     }
@@ -311,8 +356,14 @@ export class BitgetReactorAgent {
       mandateId: id,
       stage: "execution",
       input: { shouldExecute },
-      output: { status, executionMode: this.cfg.executionMode },
-      proofAnchors: { paperFillSource },
+      output: {
+        status,
+        executionMode: this.cfg.executionMode,
+        ...(executionError ? { error: executionError } : {}),
+      },
+      proofAnchors: isDemo
+        ? { bitgetRequestId: demoOrder?.orderId }
+        : { paperFillSource },
     });
 
     const mandate: SignalMandate = {
@@ -360,13 +411,14 @@ export class BitgetReactorAgent {
       execution: {
         adapter: this.cfg.executionMode,
         ...(paperFill ? { paperFill } : {}),
+        ...(demoOrder ? { finalOrder: { ...demoOrder } } : {}),
         status,
       },
       watchdog: { armed: status === "filled", triggers: [], actionsTaken: [] },
       proofAnchors: {
-        paperFillSource,
+        ...(isDemo ? {} : { paperFillSource }),
         marketDataTimestamp: perception.marketDataTimestamp,
-        bitgetRequestId: undefined,
+        bitgetRequestId: demoOrder?.orderId,
       },
       audit: {
         jsonlPath: this.auditPath,

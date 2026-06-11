@@ -25,8 +25,8 @@ describe("execution mode selection", () => {
     expect(sel.mode).toBe("backtest");
   });
 
-  it("the official demo executor fails loudly (never fakes a fill)", () => {
-    expect(() => new OfficialBitgetDemoExecutor().open()).toThrow(/not implemented/);
+  it("the official demo executor refuses to spawn on missing credentials", () => {
+    expect(() => OfficialBitgetDemoExecutor.spawn(null)).toThrow(/Demo Trading API key/);
   });
 });
 
