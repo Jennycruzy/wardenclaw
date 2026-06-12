@@ -153,7 +153,8 @@ async function main(): Promise<void> {
   });
   console.log(
     `[bitget] strategy compiled (${compiled.source}): universe ${compiled.strategy.universe.join("/")}` +
-      (compiled.clamped.length > 0 ? ` · clamped: ${compiled.clamped.join(", ")}` : ""),
+      (compiled.clamped.length > 0 ? ` · clamped: ${compiled.clamped.join(", ")}` : "") +
+      (compiled.fallbackReason ? ` · llm fallback: ${compiled.fallbackReason.slice(0, 120)}` : ""),
   );
 
   const cfg: BitgetAgentConfig = {

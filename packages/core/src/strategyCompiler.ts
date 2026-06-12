@@ -34,6 +34,8 @@ export interface CompileStrategyResult {
   /** "llm" when a provider produced it, "manual" when the fallback was used. */
   source: "llm" | "manual";
   clamped: string[];
+  /** Why the LLM path was not used (set only when source is "manual"). */
+  fallbackReason?: string;
 }
 
 /** Clamp every risk number to the safe side of the configured hard caps. */
@@ -97,6 +99,7 @@ export async function compileStrategy(
 
   let raw: CompiledStrategy;
   let source: "llm" | "manual";
+  let fallbackReason: string | undefined;
 
   try {
     raw = await provider.generateStructured({
@@ -115,6 +118,7 @@ export async function compileStrategy(
     }
     raw = compiledStrategySchema.parse(input.manualStrategy);
     source = "manual";
+    fallbackReason = (err as Error).message;
   }
 
   // Fill any zero/blank risk limits with config defaults, then clamp to caps.
@@ -128,5 +132,5 @@ export async function compileStrategy(
     validationMode: input.validationMode ?? raw.validationMode,
   };
 
-  return { strategy, source, clamped };
+  return { strategy, source, clamped, ...(fallbackReason ? { fallbackReason } : {}) };
 }

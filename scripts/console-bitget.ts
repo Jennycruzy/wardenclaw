@@ -572,7 +572,8 @@ async function main(): Promise<void> {
   pushEvent(
     dim(
       `strategy compiled (${compiled.source}): ${compiled.strategy.universe.join("/")}` +
-        (compiled.clamped.length > 0 ? ` · clamped: ${compiled.clamped.join(", ")}` : ""),
+        (compiled.clamped.length > 0 ? ` · clamped: ${compiled.clamped.join(", ")}` : "") +
+        (compiled.fallbackReason ? ` · llm fallback: ${compiled.fallbackReason.slice(0, 90)}` : ""),
     ),
   );
 
