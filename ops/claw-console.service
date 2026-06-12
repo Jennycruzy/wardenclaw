@@ -11,7 +11,9 @@
 #   systemctl enable --now claw-console
 #
 # Adjust WorkingDirectory/paths if the repo lives somewhere other than
-# /root/wardenclaw.
+# /root/wardenbitget. (The repo checkout on the VPS is /root/wardenbitget; the
+# console and the dashboard must run from the SAME checkout so the dashboard
+# reads the audit data the console writes.)
 
 [Unit]
 Description=WARDENCLAW xStock interactive console (tmux session claw-console)
@@ -21,11 +23,11 @@ Wants=network-online.target
 [Service]
 Type=forking
 User=root
-WorkingDirectory=/root/wardenclaw
+WorkingDirectory=/root/wardenbitget
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 ExecStartPre=-/usr/bin/tmux kill-session -t claw-console
 ExecStart=/usr/bin/tmux new-session -d -s claw-console -x 120 -y 42 \
-  "/usr/bin/bash -lc 'cd /root/wardenclaw && while true; do pnpm console:bitget; echo \"[claw-console] exited — restarting in 5s\"; sleep 5; done'"
+  "/usr/bin/bash -lc 'cd /root/wardenbitget && while true; do pnpm console:bitget; echo \"[claw-console] exited — restarting in 5s\"; sleep 5; done'"
 ExecStop=/usr/bin/tmux kill-session -t claw-console
 Restart=on-failure
 RestartSec=10

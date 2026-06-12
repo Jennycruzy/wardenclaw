@@ -44,6 +44,7 @@ import {
   isTickerStale,
   YahooFinanceNewsFeed,
   CachedNewsScanner,
+  compileBitgetStrategy,
   atrPct,
   type ScannedNews,
   type AssetPerception,
@@ -557,11 +558,32 @@ async function main(): Promise<void> {
   const book = new PaperBook(10_000);
   const reactor = reactorConfigFromEnv();
 
+  // StrategyCompilerAgent: NL intent → deterministic strategy JSON (LLM proposes
+  // when configured, clamped to hard caps; deterministic manual fallback else).
+  const compilerLlm = createLlmProvider(
+    process.env,
+    process.env.STRATEGY_COMPILER_MODEL || undefined,
+  );
+  const compiled = await compileBitgetStrategy({
+    naturalLanguageIntent: DEFAULT_BITGET_AGENT_CONFIG.naturalLanguageIntent,
+    reactor,
+    provider: compilerLlm,
+  });
+  pushEvent(
+    dim(
+      `strategy compiled (${compiled.source}): ${compiled.strategy.universe.join("/")}` +
+        (compiled.clamped.length > 0 ? ` · clamped: ${compiled.clamped.join(", ")}` : ""),
+    ),
+  );
+
   const cfg: BitgetAgentConfig = {
     ...DEFAULT_BITGET_AGENT_CONFIG,
     reactor,
     executionMode: "internal_paper_engine",
-    compiledStrategy: {},
+    perTradeRiskPct: compiled.strategy.riskLimits.perTradeRiskPct,
+    stopAtrMultiple: compiled.strategy.riskLimits.stopAtrMultiple,
+    netEdgeMinBps: compiled.strategy.riskLimits.netEdgeMinBps,
+    compiledStrategy: compiled.strategy,
   };
   const agent = new BitgetReactorAgent(cfg, book, audit, auditPath);
 

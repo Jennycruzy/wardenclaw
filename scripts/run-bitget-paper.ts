@@ -44,6 +44,7 @@ import {
   selectExecutionMode,
   YahooFinanceNewsFeed,
   CachedNewsScanner,
+  compileBitgetStrategy,
   type AssetPerception,
   type ShockDetection,
   type BitgetAgentConfig,
@@ -138,11 +139,32 @@ async function main(): Promise<void> {
       `cooldown ${reactor.cooldownBars} bars, entry score ≥${reactor.minEntryScore}, ` +
       `take-profit +${((reactor.takeProfitPct ?? 0) * 100).toFixed(1)}%, max hold ${reactor.maxHoldBars} bars`,
   );
+  // StrategyCompilerAgent (§10.1 steps 1–2): NL intent → deterministic strategy
+  // JSON. The LLM proposes when configured; risk numbers are clamped to the hard
+  // caps either way; with no LLM the deterministic manual strategy is used.
+  const compilerLlm = createLlmProvider(
+    process.env,
+    process.env.STRATEGY_COMPILER_MODEL || undefined,
+  );
+  const compiled = await compileBitgetStrategy({
+    naturalLanguageIntent: DEFAULT_BITGET_AGENT_CONFIG.naturalLanguageIntent,
+    reactor,
+    provider: compilerLlm,
+  });
+  console.log(
+    `[bitget] strategy compiled (${compiled.source}): universe ${compiled.strategy.universe.join("/")}` +
+      (compiled.clamped.length > 0 ? ` · clamped: ${compiled.clamped.join(", ")}` : ""),
+  );
+
   const cfg: BitgetAgentConfig = {
     ...DEFAULT_BITGET_AGENT_CONFIG,
     reactor,
     executionMode: mode.mode,
-    compiledStrategy: {},
+    // The compiled limits bind the agent: they were clamped to the hard caps.
+    perTradeRiskPct: compiled.strategy.riskLimits.perTradeRiskPct,
+    stopAtrMultiple: compiled.strategy.riskLimits.stopAtrMultiple,
+    netEdgeMinBps: compiled.strategy.riskLimits.netEdgeMinBps,
+    compiledStrategy: compiled.strategy,
   };
   const agent = new BitgetReactorAgent(cfg, book, audit, auditPath, undefined, {
     demoExecutor,

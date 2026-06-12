@@ -19,17 +19,20 @@ simulated paper fills on real market data, and are always labeled as such.
 
 - **`packages/core`** — the deterministic engine: Signal Mandate schema, configurable risk config,
   friction model (real + simulated), net-edge gate, volatility stops + coherence, drawdown governor,
-  shadow-fill guard, score→expected-move calibration, scorer, Risk Constitution, hash-chained audit,
-  replay, mandate store, backtester, and the LLM provider layer.
+  shadow-fill guard, score→expected-move calibration, scorer, Risk Constitution, the watchdog
+  (stop / profit target / sentiment-reversal / time exits, §3.6 action vocabulary), hash-chained
+  audit, replay, mandate store, backtester, and the LLM provider layer.
 - **`packages/bitget-adapter`** — real public market data, the shock/cooldown reactor with
-  first-spike rejection, the internal paper engine, the event-shock ranker, the agent stack, the
-  optional Agent Hub MCP perception source, and the backtest harness.
+  first-spike rejection, the internal paper engine, the event-shock ranker, the agent stack
+  (with the strategy compiler wired in at startup: NL intent → clamped deterministic JSON,
+  recorded on every mandate), the optional Agent Hub MCP perception source, and the backtest
+  harness.
 - **`apps/web`** — the `/bitget` judge dashboard: overview, mandates list + per-mandate replay,
   backtest report, and a live console bridge.
 - **LLM policy** — the LLM only *proposes* (strategy compilation, news-sentiment classification,
   audit summaries); the deterministic gates always decide. A disabled/manual mode is fully supported.
 
-Docs: `docs/{SETUP,BITGET_SUBMISSION,LLM_POLICY}.md`. Start with `docs/SETUP.md`.
+Docs: `docs/{SETUP,BITGET_SUBMISSION,SAFETY,LLM_POLICY,SELF_AUDIT}.md`. Start with `docs/SETUP.md`.
 
 ## Develop
 

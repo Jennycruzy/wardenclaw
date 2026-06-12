@@ -95,6 +95,78 @@ describe("BitgetReactorAgent cycle", () => {
     }
   });
 
+  it("arms the watchdog triggers (incl. sentiment_reversal) on a filled mandate", async () => {
+    const { agent, dir } = makeAgent();
+    try {
+      const result = await agent.runCycle([confirmedPerception("NVDAx")]);
+      const m = result.mandates[0]!;
+      expect(m.watchdog.armed).toBe(true);
+      expect(m.watchdog.triggers).toEqual(
+        expect.arrayContaining(["volatility_stop", "take_profit", "sentiment_reversal", "max_hold"]),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits an open position when sentiment reverses (watchdog sentiment_reversal)", async () => {
+    const { agent, book, audit, dir } = makeAgent();
+    try {
+      // Cycle 1: confirmed entry.
+      await agent.runCycle([confirmedPerception("NVDAx")]);
+      expect(book.getPosition("NVDAx")).toBeDefined();
+
+      // Cycle 2: price holds between stop and target, but real news turns
+      // negative with high confidence → the watchdog closes the long.
+      const p = confirmedPerception("NVDAx");
+      p.midPrice = 106.2;
+      p.marketDataTimestamp = "2026-06-01T00:10:00Z";
+      p.event = {
+        direction: "negative",
+        confidence: 0.9,
+        tradeRelevance: "high",
+        riskFlags: [],
+      };
+      const result = await agent.runCycle([p]);
+      expect(book.getPosition("NVDAx")).toBeUndefined();
+      expect(result.exits).toHaveLength(1);
+      expect(result.exits[0]!.reason).toBe("watchdog");
+
+      // The fired trigger is recorded as a watchdog-stage audit event.
+      const events = await audit.readAll();
+      const wd = events.find((e) => e.stage === "watchdog");
+      expect(wd).toBeDefined();
+      expect(wd!.output).toMatchObject({
+        trigger: "sentiment_reversal",
+        action: "close_position",
+      });
+      expect(verifyChain(events)).toBe(-1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not exit on a low-confidence negative event", async () => {
+    const { agent, book, dir } = makeAgent();
+    try {
+      await agent.runCycle([confirmedPerception("NVDAx")]);
+      const p = confirmedPerception("NVDAx");
+      p.midPrice = 106.2;
+      p.marketDataTimestamp = "2026-06-01T00:10:00Z";
+      p.event = {
+        direction: "negative",
+        confidence: 0.3,
+        tradeRelevance: "high",
+        riskFlags: [],
+      };
+      const result = await agent.runCycle([p]);
+      expect(book.getPosition("NVDAx")).toBeDefined();
+      expect(result.exits).toHaveLength(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("executes only the top-ranked candidate when several confirm", async () => {
     const { agent, book, dir } = makeAgent();
     try {

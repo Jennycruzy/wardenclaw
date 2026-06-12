@@ -80,6 +80,12 @@ export interface ReactorConfig {
   takeProfitPct?: number;
   /** Time exit: close after this many 5-minute bars if neither stop nor target hit. */
   maxHoldBars?: number;
+  /**
+   * Sentiment-reversal exit ("exit if sentiment reverses"): close a long when a
+   * classified real-news event turns negative with at least this confidence
+   * (0..1) and relevance above "low". Watchdog-enforced.
+   */
+  sentimentExitConfidence?: number;
 }
 
 export const DEFAULT_REACTOR_CONFIG: ReactorConfig = {
@@ -90,6 +96,7 @@ export const DEFAULT_REACTOR_CONFIG: ReactorConfig = {
   maxSingleStockPct: 0.5,
   takeProfitPct: 0.015,
   maxHoldBars: 48,
+  sentimentExitConfidence: 0.65,
 };
 
 /**
@@ -115,6 +122,10 @@ export function reactorConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Reac
     maxSingleStockPct: num(env.BITGET_MAX_SINGLE_STOCK_PCT, DEFAULT_REACTOR_CONFIG.maxSingleStockPct),
     takeProfitPct: num(env.BITGET_TAKE_PROFIT_PCT, DEFAULT_REACTOR_CONFIG.takeProfitPct!),
     maxHoldBars: num(env.BITGET_MAX_HOLD_BARS, DEFAULT_REACTOR_CONFIG.maxHoldBars!),
+    sentimentExitConfidence: num(
+      env.BITGET_SENTIMENT_EXIT_CONFIDENCE,
+      DEFAULT_REACTOR_CONFIG.sentimentExitConfidence!,
+    ),
   };
 }
 

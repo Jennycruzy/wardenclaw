@@ -14,11 +14,14 @@
 
 import {
   AuditLogger,
+  armedTriggers,
   computeFriction,
   evaluateNetEdge,
+  evaluateWatchdog,
   parseMandate,
   type SignalMandate,
   type MandateMode,
+  type WatchdogConfig,
 } from "@wardenclaw/core";
 import type { BitgetCandle, BitgetExecutionMode } from "./types.js";
 import {
@@ -157,35 +160,66 @@ export class BitgetReactorAgent {
     }
   }
 
+  /** Watchdog trigger configuration derived from the reactor config. */
+  private watchdogConfig(): WatchdogConfig {
+    return {
+      takeProfitPct: this.cfg.reactor.takeProfitPct ?? DEFAULT_REACTOR_CONFIG.takeProfitPct!,
+      maxHoldBars: this.cfg.reactor.maxHoldBars ?? DEFAULT_REACTOR_CONFIG.maxHoldBars!,
+      sentimentExitMinConfidence:
+        this.cfg.reactor.sentimentExitConfidence ??
+        DEFAULT_REACTOR_CONFIG.sentimentExitConfidence!,
+    };
+  }
+
   /**
-   * Enforce exits on open positions against current real prices: the recorded
-   * volatility stop, the profit target, and the max-hold time exit. Every exit
-   * is executed in the book (and on Bitget demo when wired) and audited.
+   * WatchdogAgent: enforce exits on open positions against current real
+   * perception — the recorded volatility stop, the profit target, the
+   * sentiment-reversal exit ("exit if sentiment reverses"), and the max-hold
+   * time exit. Every fired trigger writes a watchdog-stage audit event, and the
+   * exit is executed in the book (and on Bitget demo when wired) and settled.
    */
   private async enforceExits(perceptions: AssetPerception[]): Promise<PaperTrade[]> {
     const BAR_MS = 5 * 60_000;
-    const takeProfitPct = this.cfg.reactor.takeProfitPct ?? DEFAULT_REACTOR_CONFIG.takeProfitPct!;
-    const maxHoldBars = this.cfg.reactor.maxHoldBars ?? DEFAULT_REACTOR_CONFIG.maxHoldBars!;
+    const wdCfg = this.watchdogConfig();
     const exits: PaperTrade[] = [];
     for (const p of perceptions) {
       const pos = this.book.getPosition(p.asset);
       if (!pos || p.feedStale) continue;
       const heldBars = (Date.parse(p.marketDataTimestamp) - Date.parse(pos.openedAt)) / BAR_MS;
-      let reason: PaperTrade["reason"] | null = null;
-      let why = "";
-      if (p.midPrice <= pos.stopPrice) {
-        reason = "stop";
-        why = `volatility stop hit (${p.midPrice} ≤ ${pos.stopPrice})`;
-      } else if (p.midPrice >= pos.entryPrice * (1 + takeProfitPct)) {
-        reason = "signal_exit";
-        why = `profit target +${(takeProfitPct * 100).toFixed(1)}% reached`;
-      } else if (heldBars >= maxHoldBars) {
-        reason = "signal_exit";
-        why = `max hold ${maxHoldBars} bars elapsed`;
-      }
-      if (!reason) continue;
+      const verdict = evaluateWatchdog(
+        {
+          entryPrice: pos.entryPrice,
+          stopPrice: pos.stopPrice,
+          currentPrice: p.midPrice,
+          heldBars,
+        },
+        wdCfg,
+        p.event,
+      );
+      if (!verdict) continue;
+      const reason: PaperTrade["reason"] =
+        verdict.trigger === "volatility_stop"
+          ? "stop"
+          : verdict.trigger === "sentiment_reversal"
+            ? "watchdog"
+            : "signal_exit";
+      const why = verdict.reason;
 
       const ts = this.now();
+      await this.audit.append({
+        timestamp: ts,
+        mandateId: pos.mandateId ?? `exit-${p.asset}-${ts}`,
+        stage: "watchdog",
+        input: {
+          asset: p.asset,
+          midPrice: p.midPrice,
+          stopPrice: pos.stopPrice,
+          heldBars: Math.floor(heldBars),
+          ...(p.event ? { eventDirection: p.event.direction, eventConfidence: p.event.confidence } : {}),
+        },
+        output: { trigger: verdict.trigger, action: verdict.action, reason: why },
+        proofAnchors: { marketDataTimestamp: p.marketDataTimestamp },
+      });
       let demoOrder: DemoOrderResult | undefined;
       let executionError: string | undefined;
       if (this.cfg.executionMode === "official_bitget_demo" && this.wiring.demoExecutor && this.wiring.symbolFor) {
@@ -491,7 +525,11 @@ export class BitgetReactorAgent {
         ...(demoOrder ? { finalOrder: { ...demoOrder } } : {}),
         status,
       },
-      watchdog: { armed: status === "filled", triggers: [], actionsTaken: [] },
+      watchdog: {
+        armed: status === "filled",
+        triggers: status === "filled" ? armedTriggers(this.watchdogConfig()) : [],
+        actionsTaken: [],
+      },
       proofAnchors: {
         ...(isDemo ? {} : { paperFillSource }),
         marketDataTimestamp: perception.marketDataTimestamp,

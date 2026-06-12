@@ -13,6 +13,8 @@ export * from "./riskConstitution.js";
 export * from "./signalMandate.js";
 export * from "./mandateStore.js";
 export * from "./strategyCompiler.js";
+export * from "./watchdog.js";
+export * from "./prompts.js";
 export * from "./replayEngine.js";
 export * from "./backtester.js";
 export * from "./proofAnchors.js";
