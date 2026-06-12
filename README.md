@@ -1,52 +1,55 @@
-# WARDENCLAW
+# WARDENCLAW — Bitget xStock Reactor
 
-> WARDENCLAW turns natural-language trading strategies into risk-bound Signal Mandates that can trade, survive, and prove why they acted.
+> WARDENCLAW turns natural-language trading ideas into risk-bound **Signal Mandates** that react to
+> tokenized-equity (xStock) earnings/news/sentiment shocks on Bitget — and prove why they acted.
 
-One shared deterministic core, two focused submissions:
-
-- **WARDENCLAW Stocks** — a Bitget-native paper-trading agent that reacts to tokenized-equity earnings/news/sentiment shocks under deterministic risk gates.
-- **WARDENCLAW BSC** — a live, self-custodial, spot-only BSC trading agent that reads markets via CoinMarketCap, signs through Trust Wallet Agent Kit, and optimizes total return under a drawdown cap from a $40 book.
+A Bitget-native **paper-trading** agent. It reads real Bitget public market data for the xStock
+universe, detects earnings/news/sentiment shocks, and runs every candidate trade through a
+deterministic, configurable risk gate before a simulated fill. Every decision becomes a
+hash-chained, replayable audit event you can inspect in the dashboard.
 
 ## Status
 
-Both submissions are built. The shared TypeScript core is the source of truth for
-the frontend, backend, and worker. External integrations (Bitget public data, CMC
-Agent Hub + x402, Trust Wallet Agent Kit, BNB AI Agent SDK, PancakeSwap) are real
-adapters that fail loudly when unconfigured — never faked. ~190 tests pass;
-`typecheck`, `lint`, and the Next.js build are green.
+Built and green: `typecheck`, `lint`, the test suite, and the Next.js build all pass. External
+integrations (Bitget public market data, the official Bitget Agent Hub MCP server, per-equity Yahoo
+Finance news) are **real adapters that fail loudly when unconfigured — never faked**. Fills are
+simulated paper fills on real market data, and are always labeled as such.
 
-### What's implemented
+## What's implemented
 
-- **`packages/core`** — the deterministic engine: Signal Mandate schema, risk
-  config, friction model (real + simulated), net-edge gate, volatility stops +
-  coherence, three-layer drawdown governor, shadow-fill guard, calibration mapping,
-  address-keyed eligible allowlist, scorer, Risk Constitution, hash-chained audit,
-  replay, recovery, hourly snapshots, mandate store, LLM provider layer.
-- **Bitget submission** — `packages/bitget-adapter` (real public market data,
-  shock/cooldown reactor with first-spike rejection, internal paper engine,
-  ranker, agent stack, backtest) + `apps/web` `/bitget` judge dashboard.
-- **BNB submission** — `packages/{cmc,twak,bsc}-adapter` + `packages/bnb-agent`
-  (the full gate-chain pipeline, scheduler, runtime ops), `apps/api` (kill-switch),
-  `apps/worker` (recovery + loop + snapshots), `apps/web` `/bsc` dashboards incl.
-  the `/bsc/proof` judge scoreboard.
+- **`packages/core`** — the deterministic engine: Signal Mandate schema, configurable risk config,
+  friction model (real + simulated), net-edge gate, volatility stops + coherence, drawdown governor,
+  shadow-fill guard, score→expected-move calibration, scorer, Risk Constitution, hash-chained audit,
+  replay, mandate store, backtester, and the LLM provider layer.
+- **`packages/bitget-adapter`** — real public market data, the shock/cooldown reactor with
+  first-spike rejection, the internal paper engine, the event-shock ranker, the agent stack, the
+  optional Agent Hub MCP perception source, and the backtest harness.
+- **`apps/web`** — the `/bitget` judge dashboard: overview, mandates list + per-mandate replay,
+  backtest report, and a live console bridge.
+- **LLM policy** — the LLM only *proposes* (strategy compilation, news-sentiment classification,
+  audit summaries); the deterministic gates always decide. A disabled/manual mode is fully supported.
 
-Docs: `docs/{SETUP,COMPETITION_RULES,BITGET_SUBMISSION,BNB_SUBMISSION,SPECIAL_PRIZES,
-SAFETY,LLM_POLICY,ECONOMICS,OPERATIONS,PREFLIGHT,SELF_AUDIT}.md`. Start with
-`docs/SETUP.md`.
+Docs: `docs/{SETUP,BITGET_SUBMISSION,LLM_POLICY}.md`. Start with `docs/SETUP.md`.
 
 ## Develop
 
 ```bash
 pnpm install
 pnpm typecheck && pnpm lint && pnpm test
-pnpm demo:twak-refusal              # see TWAK refuse bad trades
-pnpm --filter @wardenclaw/web dev     # dashboards on http://localhost:3000
+pnpm run:bitget-paper                  # run the reactor on real Bitget data (paper fills)
+pnpm console:bitget                    # interactive live console
+pnpm backtest:bitget                   # backtest over real historical candles
+pnpm verify:bitget-hub                 # prove the Agent Hub MCP integration end-to-end
+pnpm --filter @wardenclaw/web dev      # dashboard on http://localhost:3000
 ```
 
 ## Safety
 
-This is hackathon trading, not investment advice. BSC execution is **spot-only** by team decision. Private keys never touch the backend or database — signing is local through Trust Wallet Agent Kit. Every trade decision produces a structured, replayable audit event.
+This is hackathon paper trading, not investment advice. The reactor never places real exchange
+orders: fills are simulated against real Bitget market data and are always labeled
+`internal_paper_engine`. Every trade decision produces a structured, replayable audit event.
 
 ## Environment
 
 Copy `.env.example` to `.env` and fill in the values you need. Every variable is documented inline.
+The agent runs with no LLM key (deterministic mode) and with no Bitget API key (public data only).

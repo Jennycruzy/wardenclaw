@@ -19,8 +19,9 @@
 
 import "dotenv/config";
 
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parse as parseEnv } from "dotenv";
 import { AuditLogger, appendMandate, createLlmProvider } from "@wardenclaw/core";
 import {
   BitgetPublicMarketData,
@@ -52,6 +53,23 @@ const granularity = process.env.BITGET_CANDLE_GRANULARITY ?? "5min";
 const pollSeconds = Number(process.env.BITGET_POLL_SECONDS ?? "60");
 const cycles = Number(process.env.BITGET_CYCLES ?? "1");
 const STALE_MS = 10 * 60_000;
+
+/**
+ * Live kill-switch. Re-reads .env on each cycle so flipping REACTOR_PAUSED
+ * pauses/resumes mandate generation without restarting the process.
+ * Accepts 1/true/yes/on (case-insensitive); anything else means "running".
+ */
+function reactorPaused(): boolean {
+  let raw = process.env.REACTOR_PAUSED ?? "";
+  try {
+    const env = parseEnv(readFileSync(join(process.cwd(), ".env")));
+    if (env.REACTOR_PAUSED !== undefined) raw = env.REACTOR_PAUSED;
+  } catch {
+    // .env not present — fall back to the value loaded at startup.
+  }
+  const v = raw.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
 
 interface ShockState {
   barsSinceShock: number | null;
@@ -238,6 +256,11 @@ async function main(): Promise<void> {
       console.error(
         "[bitget] no xStock data resolved. Verify the Bitget xStock symbol convention " +
           "in packages/bitget-adapter/src/universe.ts before paper trading.",
+      );
+    } else if (reactorPaused()) {
+      console.log(
+        `[bitget] cycle ${cycle + 1}/${cycles}: PAUSED via REACTOR_PAUSED — perception only, ` +
+          `no mandates generated (set REACTOR_PAUSED=false in .env to resume)`,
       );
     } else {
       const result = await agent.runCycle(perceptions);

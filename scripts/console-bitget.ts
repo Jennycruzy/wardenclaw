@@ -23,6 +23,7 @@ import "dotenv/config";
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { parse as parseEnv } from "dotenv";
 import { emitKeypressEvents } from "node:readline";
 import { AuditLogger, appendMandate, createLlmProvider } from "@wardenclaw/core";
 import {
@@ -133,6 +134,23 @@ const MAX_EVENTS = 200;
 let pollSeconds = Math.max(10, Number(process.env.BITGET_POLL_SECONDS ?? "30"));
 let paused = false;
 let tradingEnabled = true;
+
+/**
+ * Live kill-switch shared with the headless paper agent. Re-reads .env each
+ * cycle so flipping REACTOR_PAUSED suppresses mandate generation without
+ * restarting the console. Accepts 1/true/yes/on (case-insensitive).
+ */
+function reactorPaused(): boolean {
+  let raw = process.env.REACTOR_PAUSED ?? "";
+  try {
+    const env = parseEnv(readFileSync(join(process.cwd(), ".env")));
+    if (env.REACTOR_PAUSED !== undefined) raw = env.REACTOR_PAUSED;
+  } catch {
+    // .env not present — fall back to the value loaded at startup.
+  }
+  const v = raw.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
 let scanning = false;
 let scanningSymbol: string | null = null;
 let nextScanAt = Date.now();
@@ -480,7 +498,7 @@ async function scanOnce(
   }
   scanningSymbol = null;
 
-  if (perceptions.length > 0 && tradingEnabled) {
+  if (perceptions.length > 0 && tradingEnabled && !reactorPaused()) {
     const result = await agent.runCycle(perceptions);
     for (const mandate of result.mandates) {
       await appendMandate(mandatesPath, mandate);
@@ -498,6 +516,9 @@ async function scanOnce(
     if (rejected > 0 && cycle % 10 === 1) {
       pushEvent(dim(`${rejected} asset(s) gated this cycle (disciplined skips — see dashboard)`));
     }
+  } else if (perceptions.length > 0 && reactorPaused()) {
+    if (cycle % 10 === 1)
+      pushEvent(yellow("REACTOR_PAUSED=true — scanning live, mandate generation suppressed (set false in .env to resume)"));
   } else if (perceptions.length > 0 && !tradingEnabled) {
     if (cycle % 10 === 1) pushEvent(yellow("watch-only: signals evaluated, execution suppressed ([t] to enable)"));
   }

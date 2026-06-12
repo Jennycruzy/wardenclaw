@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   const schema = z.object({ ok: z.boolean(), venue: z.string() });
   const out = await provider.generateStructured({
     system: "You are a JSON API. Output only a JSON object, no prose.",
-    user: 'Reply with this exact JSON object: {"ok": true, "venue": "bsc"}',
+    user: 'Reply with this exact JSON object: {"ok": true, "venue": "bitget"}',
     schema,
   });
   console.log(`✅ live structured call OK → ${JSON.stringify(out)}`);
