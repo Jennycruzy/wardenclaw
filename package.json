@@ -20,7 +20,8 @@
     "verify:integrations": "tsx scripts/verify-integrations.ts",
     "verify:llm": "tsx scripts/verify-llm.ts",
     "verify:bitget-hub": "tsx scripts/verify-bitget-hub.ts",
-    "verify:bitget-demo-key": "tsx scripts/verify-bitget-demo-key.ts"
+    "verify:bitget-demo-key": "tsx scripts/verify-bitget-demo-key.ts",
+    "demo:bypass": "tsx scripts/demo-bypass.ts"
   },
   "devDependencies": {
     "@wardenclaw/bitget-adapter": "workspace:*",
