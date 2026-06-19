@@ -90,12 +90,15 @@ async function main(): Promise<void> {
     // its handshake times out). Both sources are real Bitget data — the public
     // REST fallback is not a fabrication — so a flaky MCP server must never take
     // the whole agent down and stop mandate generation.
+    // Perception reads ONLY public Bitget market data — spot ticker/candles and
+    // futures funding-rate/open-interest are all public endpoints. So run the MCP
+    // server in PUBLIC read-only mode (no account credentials). Passing the API key
+    // set makes the server do an authenticated startup that intermittently exceeds
+    // the initialize handshake timeout and triggers Bitget rate-limiting (429),
+    // which is what made startup unreliable; public mode initializes instantly.
     const client = new BitgetMcpClient({
       modules: "spot,futures",
       readOnly: true,
-      apiKey: process.env.BITGET_API_KEY,
-      secretKey: process.env.BITGET_API_SECRET,
-      passphrase: process.env.BITGET_API_PASSPHRASE,
     });
     try {
       await client.start();
