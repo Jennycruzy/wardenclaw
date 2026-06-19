@@ -21,6 +21,7 @@ export * from "./playbookShield.js";
 export * from "./tradePermit.js";
 export * from "./wardenPermit.js";
 export * from "./wardenExecutor.js";
+export * from "./closeOnlyWatcher.js";
 export * from "./backtester.js";
 export * from "./proofAnchors.js";
 export * from "./llm/index.js";
