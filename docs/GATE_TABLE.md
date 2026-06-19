@@ -51,8 +51,28 @@ Stale data → BLOCK · engine exception → BLOCK · unknown asset → BLOCK ·
 confirmation → DELAY · unsafe liquidation → REDUCE/BLOCK. The verdict comes only from
 these deterministic gates.
 
+## Live perception wiring
+
+The gate inputs are assembled from REAL Bitget perception by
+`packages/bitget-adapter/src/marketContext.ts`:
+
+- `gatherPerception(source, symbol, …)` fetches the ticker + candles from a live
+  `MarketDataSource` (public HTTP `BitgetPublicMarketData` or the Bitget MCP server
+  `BitgetMcpMarketData`) and assembles the `MarketContext`.
+- `buildMarketContext(…)` is the pure assembly: price + feed staleness from the
+  ticker, the realized-vol percentile and the premium "last close" reference from the
+  candles, the NYSE session from the clock, the BTC-correlation flag from the verified
+  universe, and the optional declared-source signals (earnings calendar, news-shock
+  timestamps, orderbook spread, BTC realized vol) passed through from their skills.
+- A missing feed leaves its field undefined so the dependent gate stays
+  conservative/closed — never fabricated.
+
+Prove it live (real public data, no keys): `pnpm verify:perception`.
+
 ## Code & tests
 
 - `packages/core/src/tradePermit.ts` — the gates, the config, and `evaluateTradePermit`.
 - `packages/core/test/tradePermit.test.ts` — the six canonical acceptance fixtures, the
   fail-closed branches, and per-gate threshold tests.
+- `packages/bitget-adapter/src/marketContext.ts` + `test/marketContext.test.ts` — the
+  live perception → gate-input wiring.

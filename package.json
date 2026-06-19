@@ -25,7 +25,8 @@
     "demo:closeonly": "tsx scripts/demo-closeonly.ts",
     "run:scorecard": "tsx scripts/run-scorecard.ts",
     "evidence:run": "tsx scripts/evidence-run.ts",
-    "mcp:wardenclaw": "tsx scripts/warden-mcp-server.ts"
+    "mcp:wardenclaw": "tsx scripts/warden-mcp-server.ts",
+    "verify:perception": "tsx scripts/verify-perception.ts"
   },
   "devDependencies": {
     "@wardenclaw/bitget-adapter": "workspace:*",
