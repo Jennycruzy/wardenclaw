@@ -41,22 +41,22 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 | 7 | MCP end-to-end round-trip test | ✅ | `test/mcpServer.test.ts` |
 | 8 | Structured logger (stdout + JSONL) | ✅ | `evidenceLog.ts` |
 | 8 | `evidence:run` transcript | ✅ | `scripts/evidence-run.ts` |
-| 8.b | Studio-parity paper records (NAV marks, round-trips, early win-rate/profit-factor) | 🟡 | partial — the internal paper engine (`paperEngine.ts`) records paper fills and the dashboard surfaces mandates; dedicated NAV/round-trip/win-rate views are **not yet** built out |
+| 8.b | Studio-parity paper records (NAV marks, round-trips, early win-rate/profit-factor) | ✅ | `paperRecords.ts` (`buildPaperRecords`, `computePerformance`) + the `/bitget/records` page; win-rate/profit-factor surface from the first closed trip |
 | 9 | UI: verdict badges, Playbook panel, original-vs-adjusted comparison, verification panel, fail-closed banner | ✅ | `apps/web/app/bitget/firewall/page.tsx`, `components/firewall.tsx` (server-rendered from the real engine) |
-| 9 | UI extras: ghost-sim panel, scorecard view, Bitget asset logos, separated NAV/price charts | 🟡 | not yet — the core firewall panels exist; these presentational extras remain |
+| 9 | UI extras: ghost-sim panel, scorecard summary view | ✅ | `/bitget/records` page (computed from real fixture candles + `output/scorecard.json`) |
+| 9 | UI extras: Bitget asset logos, separated backtest/live-NAV/price charts | 🟡 | minor presentational polish only — not yet |
+| Perception | Live Bitget perception wired into the gate inputs | ✅ | `marketContext.ts`, `scripts/verify-perception.ts` (proven against real public data) |
 | 10 | Full test suite | ✅ | 252 tests (174 core + 78 adapter) |
 | 10 | Docs (README, GATE_TABLE, PLAYBOOK_SHIELD) | ✅ | `README.md`, `docs/GATE_TABLE.md`, `docs/PLAYBOOK_SHIELD.md` |
 | 10 | Demo kit + submission blurb + this checklist | ✅ | `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_BLURB.md`, this file |
 
 ## Outstanding work (honest)
 
-1. **Phase 9 UI extras** — the core firewall panels (badges, Playbook Shield,
-   comparison, verification, fail-closed banner) are live at `/bitget/firewall`. The
-   remaining items are presentational: a ghost-sim panel, a scorecard view, Bitget
-   asset logos, and separated backtest/live-NAV/price charts.
-2. **Phase 8.b studio-parity records** — NAV marks, round-trip records, and early
-   win-rate / profit-factor views over the paper engine.
+Only minor presentational polish remains: **Bitget asset logos** (use the public
+coin-logo catalog) and **separated backtest / live-NAV / symbol-price charts** with
+execution markers. Everything else in the spec is implemented.
 
-The enforcement spine, both checkpoints, signed permits, the executor, the evidence
-logger, the scorecard, the MCP server, and the core firewall UI are complete, tested
-(252 tests), and verified running on the deployment VPS.
+The two checkpoints, signed permits, the executor + atomic hedge, the close-only
+watcher, ghost-sim + scorecard, the MCP server, native evidence + studio-parity paper
+records, live Bitget perception wiring, and the firewall + records UI are complete,
+tested (265 tests), and verified running on the deployment VPS.
