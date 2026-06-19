@@ -10,6 +10,7 @@ export * from "./indicators.js";
 export * from "./reactor.js";
 export * from "./eventShockRanker.js";
 export * from "./paperEngine.js";
+export * from "./paperRecords.js";
 export * from "./executionAdapter.js";
 export * from "./demoExecutor.js";
 export * from "./riskGate.js";
