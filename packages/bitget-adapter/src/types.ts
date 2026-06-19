@@ -25,6 +25,13 @@ export interface XStockSymbol {
   /** The underlying equity ticker, e.g. "NVDA". */
   underlying: string;
   kind: "xstock" | "index_proxy";
+  /**
+   * Whether the underlying trades with the crypto/BTC complex (e.g. MSTR, COIN).
+   * Drives the BTC-correlation HEDGE gate and CLOSE-ONLY survival logic — these
+   * names move with BTC realized vol, so a long carries crypto beta the equity
+   * names do not. Absent/false means an ordinary equity.
+   */
+  btcCorrelated?: boolean;
 }
 
 /** A normalized spot ticker parsed from the Bitget public API. */
