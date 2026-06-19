@@ -90,9 +90,9 @@ export const DEFAULT_BITGET_AGENT_CONFIG: Omit<
   netEdgeMinBps: 15,
   strategyId: "bitget-earnings-news-reactor",
   naturalLanguageIntent:
-    "Watch AAPLx/NVDAx/TSLAx/MSFTx/QQQx/SPYx. React only to earnings or major news " +
-    "shocks. Never enter the first volatility spike. Risk 3% per trade with volatility " +
-    "stops. Exit if sentiment reverses.",
+    "Watch AAPLx/NVDAx/TSLAx/MSTRx/COINx (QQQx/SPYx as index context). React only to " +
+    "earnings or major news shocks. Never enter the first volatility spike. Risk 3% per " +
+    "trade with volatility stops. Exit if sentiment reverses.",
 };
 
 export interface CycleResult {
