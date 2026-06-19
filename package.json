@@ -22,7 +22,8 @@
     "verify:bitget-hub": "tsx scripts/verify-bitget-hub.ts",
     "verify:bitget-demo-key": "tsx scripts/verify-bitget-demo-key.ts",
     "demo:bypass": "tsx scripts/demo-bypass.ts",
-    "demo:closeonly": "tsx scripts/demo-closeonly.ts"
+    "demo:closeonly": "tsx scripts/demo-closeonly.ts",
+    "run:scorecard": "tsx scripts/run-scorecard.ts"
   },
   "devDependencies": {
     "@wardenclaw/bitget-adapter": "workspace:*",
