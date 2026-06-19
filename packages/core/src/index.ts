@@ -16,6 +16,8 @@ export * from "./strategyCompiler.js";
 export * from "./watchdog.js";
 export * from "./prompts.js";
 export * from "./replayEngine.js";
+export * from "./wardenCard.js";
+export * from "./playbookShield.js";
 export * from "./backtester.js";
 export * from "./proofAnchors.js";
 export * from "./llm/index.js";

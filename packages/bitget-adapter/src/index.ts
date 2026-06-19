@@ -15,4 +15,5 @@ export * from "./demoExecutor.js";
 export * from "./riskGate.js";
 export * from "./agents.js";
 export * from "./strategy.js";
+export * from "./playbook.js";
 export * from "./backtestReactor.js";

@@ -31,6 +31,12 @@ export interface CompileBitgetStrategyInput {
   stopAtrMultiple?: number;
   /** The configured LLM provider; a DisabledProvider falls back to manual. */
   provider?: LlmProvider;
+  /**
+   * Tightened clamp config to compile under, e.g. the Warden-adjusted caps from a
+   * Restricted Playbook Shield verdict. When set it REPLACES the reactor-derived
+   * config, so the compiler (and its manual fallback) clamp to the lowered numbers.
+   */
+  riskConfigOverride?: RiskConfig;
 }
 
 export interface CompileBitgetStrategyResult {
@@ -110,7 +116,7 @@ export function manualBitgetStrategy(
 export async function compileBitgetStrategy(
   input: CompileBitgetStrategyInput,
 ): Promise<CompileBitgetStrategyResult> {
-  const config = bitgetRiskConfig(input);
+  const config = input.riskConfigOverride ?? bitgetRiskConfig(input);
   const manual = manualBitgetStrategy(input, config);
   const userPrompt = renderPrompt(loadPrompt("strategyCompiler.user.md"), {
     NATURAL_LANGUAGE_INTENT: input.naturalLanguageIntent,
