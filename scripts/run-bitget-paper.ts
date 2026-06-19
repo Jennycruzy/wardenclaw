@@ -85,15 +85,35 @@ async function main(): Promise<void> {
   let mcpClient: BitgetMcpClient | undefined;
   let md: MarketDataSource;
   if (useMcp) {
-    mcpClient = new BitgetMcpClient({
+    // Try the Agent Hub MCP server, but DEGRADE GRACEFULLY to the public REST
+    // client if it can't initialize (e.g. the MCP server binary is unavailable or
+    // its handshake times out). Both sources are real Bitget data — the public
+    // REST fallback is not a fabrication — so a flaky MCP server must never take
+    // the whole agent down and stop mandate generation.
+    const client = new BitgetMcpClient({
       modules: "spot,futures",
       readOnly: true,
       apiKey: process.env.BITGET_API_KEY,
       secretKey: process.env.BITGET_API_SECRET,
       passphrase: process.env.BITGET_API_PASSPHRASE,
     });
-    await mcpClient.start();
-    md = new BitgetMcpMarketData(mcpClient);
+    try {
+      await client.start();
+      mcpClient = client;
+      md = new BitgetMcpMarketData(client);
+    } catch (err) {
+      console.warn(
+        `[bitget] Agent Hub MCP unavailable (${(err as Error).message.slice(0, 140)}); ` +
+          `falling back to public REST market data so mandate generation continues.`,
+      );
+      try {
+        await client.stop();
+      } catch {
+        /* best-effort cleanup of the spawned MCP process */
+      }
+      mcpClient = undefined;
+      md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
+    }
   } else {
     md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
   }
