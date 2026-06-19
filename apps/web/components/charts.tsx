@@ -7,6 +7,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,6 +25,57 @@ const tooltipStyle = {
   fontSize: 12,
   color: "#ffffff",
 } as const;
+
+/**
+ * A symbol price line with execution markers aligned to the visible window.
+ * `markers` index into `data` (buy = green up, sell = amber down).
+ */
+export function PriceLine({
+  data,
+  markers = [],
+  height = 200,
+}: {
+  data: Array<{ close: number }>;
+  markers?: Array<{ index: number; side: "buy" | "sell"; label?: string }>;
+  height?: number;
+}) {
+  const points = data.map((d, i) => ({ i, close: d.close }));
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+        <CartesianGrid stroke={grid} vertical={false} />
+        <XAxis dataKey="i" tick={axis} tickLine={false} axisLine={{ stroke: grid }} />
+        <YAxis
+          tick={axis}
+          tickLine={false}
+          axisLine={{ stroke: grid }}
+          width={56}
+          domain={["auto", "auto"]}
+          tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+        />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          formatter={(v: number) => [`$${v.toFixed(2)}`, "Price"]}
+          labelFormatter={(i) => `Bar ${i}`}
+        />
+        <Line type="monotone" dataKey="close" stroke="#7aa2ff" strokeWidth={2} dot={false} />
+        {markers.map((m, k) =>
+          points[m.index] ? (
+            <ReferenceDot
+              key={k}
+              x={m.index}
+              y={points[m.index]!.close}
+              r={5}
+              fill={m.side === "buy" ? "#00ff88" : "#ffb020"}
+              stroke="#0b0b0b"
+              strokeWidth={1.5}
+            />
+          ) : null,
+        )}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
 
 export function EquityCurve({ data }: { data: Array<{ time: string; equityUsd: number }> }) {
   const points = data.map((d, i) => ({ i, equityUsd: d.equityUsd }));

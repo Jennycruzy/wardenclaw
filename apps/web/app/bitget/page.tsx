@@ -3,6 +3,7 @@ import { Shell } from "@/components/shell";
 import { LiveConsole } from "@/components/live-console";
 import { Badge, Card, Dot, EmptyState, Stat, SectionTitle } from "@/components/ui";
 import { ExecutionStatusChip, SignalFamilyChip } from "@/components/chips";
+import { AssetLogo } from "@/components/asset-logo";
 import { RejectionBars } from "@/components/charts";
 import {
   computePaperStats,
@@ -59,17 +60,20 @@ export default function BitgetOverview() {
             title="xStock universe"
             subtitle="Symbols verified against the live Bitget spot API (<TICKER>ON convention); unresolved symbols fail loudly, never priced."
           />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {TRADEABLE_XSTOCKS.map((s) => (
-              <Badge key={s.display} tone="neutral" className="font-mono">
+              <span key={s.display} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-bg-subtle px-2 py-0.5 font-mono text-xs">
+                <AssetLogo symbol={s.display} size={18} />
                 {s.display}
-              </Badge>
+                {s.btcCorrelated ? <span className="text-attack" title="BTC-correlated">₿</span> : null}
+              </span>
             ))}
             <span className="mx-1 self-center text-xs text-ink-faint">index support:</span>
             {INDEX_PROXIES.map((s) => (
-              <Badge key={s.display} tone="accent" className="font-mono">
+              <span key={s.display} className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
+                <AssetLogo symbol={s.display} size={18} />
                 {s.display}
-              </Badge>
+              </span>
             ))}
           </div>
           <p className="mt-4 text-xs leading-relaxed text-ink-muted">

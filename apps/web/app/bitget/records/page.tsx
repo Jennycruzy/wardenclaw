@@ -1,11 +1,25 @@
 import { Shell } from "@/components/shell";
 import { Card, SectionTitle, Stat, Badge, EmptyState } from "@/components/ui";
+import { AssetTag } from "@/components/asset-logo";
+import { PriceLine } from "@/components/charts";
 import { loadScorecard, loadFixtureCandles } from "@/lib/data";
 import { num } from "@/lib/format";
 import { ghostCompare, type SimCandle } from "@wardenclaw/core";
 import { PaperBook, buildPaperRecords } from "@wardenclaw/bitget-adapter";
 
 export const dynamic = "force-dynamic";
+
+/** NVDAx price window + the demo execution markers (buy @10, sell @40). */
+function priceWindow() {
+  const candles = loadFixtureCandles("NVDAx").slice(0, 60);
+  return {
+    data: candles.map((c) => ({ close: c.close })),
+    markers: [
+      { index: 10, side: "buy" as const, label: "open" },
+      { index: 40, side: "sell" as const, label: "close" },
+    ],
+  };
+}
 
 function ghostFromFixtures() {
   const candles = loadFixtureCandles("NVDAx").slice(40, 88) as SimCandle[];
@@ -38,6 +52,7 @@ export default function RecordsPage() {
   const sc = loadScorecard();
   const ghost = ghostFromFixtures();
   const rec = demoRecords();
+  const pw = priceWindow();
   const perf = rec.performance;
   const sd = sc?.summary as
     | { verdictDistribution?: Record<string, number>; aggregateMaxDrawdownUsd?: { without: number; with: number }; liquidations?: { avoided: number }; aggregatePnlUsd?: { without: number; with: number } }
@@ -75,7 +90,7 @@ export default function RecordsPage() {
                   {rec.roundTrips.map((t, i) => (
                     <tr key={i} className="border-t border-line">
                       <td className="py-1"><Badge tone={t.source === "paper" ? "accent" : "neutral"}>{t.source}</Badge></td>
-                      <td>{t.asset}</td><td>{num(t.entryPrice)}</td><td>{num(t.exitPrice)}</td>
+                      <td><AssetTag symbol={t.asset} size={18} /></td><td>{num(t.entryPrice)}</td><td>{num(t.exitPrice)}</td>
                       <td className={t.pnlUsd >= 0 ? "text-pos" : "text-neg"}>{num(t.pnlUsd)}</td>
                       <td className={t.pnlPct >= 0 ? "text-pos" : "text-neg"}>{num(t.pnlPct)}%</td>
                       <td className="text-ink-muted">{t.reason}</td>
@@ -84,6 +99,16 @@ export default function RecordsPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </Card>
+
+        {/* Symbol price + execution markers */}
+        <Card>
+          <SectionTitle title="Symbol price & execution markers" subtitle="NVDAx — real candles with paper open/close markers aligned to the window." right={<AssetTag symbol="NVDAx" size={20} />} />
+          {pw.data.length > 1 ? (
+            <PriceLine data={pw.data} markers={pw.markers} />
+          ) : (
+            <EmptyState title="No candle fixtures" hint="Run pnpm run:scorecard to cache candles." />
           )}
         </Card>
 
