@@ -1,58 +1,119 @@
-# WARDENCLAW — Bitget xStock Reactor
+# WARDENCLAW — Command Firewall for Bitget xStocks
 
-> WARDENCLAW turns natural-language trading ideas into risk-bound **Signal Mandates** that react to
-> tokenized-equity (xStock) earnings/news/sentiment shocks on Bitget — and prove why they acted.
+> A **two-checkpoint command firewall** for Bitget tokenized US stocks (xStocks).
+> It audits the **strategy** before it may run, then audits **each trade command**
+> before execution, and proves — cryptographically — why it acted.
+>
+> **No valid Warden Permit = no execution.**
+> And one step earlier: **no unsafe strategy even produces mandates.**
 
-A Bitget-native **paper-trading** agent. It reads real Bitget public market data for the xStock
-universe, detects earnings/news/sentiment shocks, and runs every candidate trade through a
-deterministic, configurable risk gate before a simulated fill. Every decision becomes a
-hash-chained, replayable audit event you can inspect in the dashboard.
+Everything is **paper / simulation only**. The LLM parses natural language and
+classifies news; **every risk verdict is deterministic**. The system is fail-closed:
+stale data, a tampered/expired/replayed permit, or an unknown asset → it refuses.
 
-## Status
+## The two checkpoints
 
-Built and green: `typecheck`, `lint`, the test suite, and the Next.js build all pass. External
-integrations (Bitget public market data, the official Bitget Agent Hub MCP server, per-equity Yahoo
-Finance news) are **real adapters that fail loudly when unconfigured — never faked**. Fills are
-simulated paper fills on real market data, and are always labeled as such.
+```
+Bitget Playbook / human / AI strategy
+        │
+        ▼
+[1] PLAYBOOK SHIELD ── audits the STRATEGY            Certified / Restricted / Rejected
+        │   (Restricted hands tightened caps to the compiler clamp)
+        ▼
+Risk-bound Signal Mandates  (only a passing strategy emits them, under its clamped caps)
+        │
+        ▼
+[2] TRADE-PERMIT ENGINE ── audits each TRADE command  APPROVE / REDUCE / DELAY / HEDGE / BLOCK / CLOSE-ONLY
+        │
+        ▼
+Sim Executor (paper only) ── independently verifies the signed permit; no valid permit = no execution
+        │
+        ▼
+Signed, hash-chained, replayable Warden Card  +  native terminal evidence
+```
 
-## What's implemented
+- **Playbook Shield** — three strategy verdicts over five deterministic static checks
+  (leverage, martingale, missing daily-drawdown cap, missing post-shock cooldown,
+  earnings/first-spike without confirmation). See `docs/PLAYBOOK_SHIELD.md`.
+- **Trade-Permit Engine** — six trade verdicts over ten deterministic gates, including
+  the asset-class-native **xStock premium/discount** gate and the BTC-correlation
+  HEDGE gate. See `docs/GATE_TABLE.md`.
+- **Warden Permit** — every non-BLOCK verdict produces a signed (HMAC-SHA256),
+  single-use, expiring, price-drift-bound, hash-chained permit. The executor verifies
+  it independently before any (paper) order.
 
-- **`packages/core`** — the deterministic engine: Signal Mandate schema, configurable risk config,
-  friction model (real + simulated), net-edge gate, volatility stops + coherence, drawdown governor,
-  shadow-fill guard, score→expected-move calibration, scorer, Risk Constitution, the watchdog
-  (stop / profit target / sentiment-reversal / time exits, §3.6 action vocabulary), hash-chained
-  audit, replay, mandate store, backtester, and the LLM provider layer.
-- **`packages/bitget-adapter`** — real public market data, the shock/cooldown reactor with
-  first-spike rejection, the internal paper engine, the event-shock ranker, the agent stack
-  (with the strategy compiler wired in at startup: NL intent → clamped deterministic JSON,
-  recorded on every mandate), the optional Agent Hub MCP perception source, and the backtest
-  harness.
-- **`apps/web`** — the `/bitget` judge dashboard: overview, mandates list + per-mandate replay,
-  backtest report, and a live console bridge.
-- **LLM policy** — the LLM only *proposes* (strategy compilation, news-sentiment classification,
-  audit summaries); the deterministic gates always decide. A disabled/manual mode is fully supported.
+## Verified universe (live-reconciled)
 
-Docs: `docs/{SETUP,BITGET_SUBMISSION,SAFETY,LLM_POLICY,SELF_AUDIT}.md`. Start with `docs/SETUP.md`.
+Exactly five tradeable xStocks, reconciled against the live Bitget symbols API
+(`docs/ARCHITECTURE_AUDIT.md`): `AAPLx`, `NVDAx`, `TSLAx` (equities) and the two
+BTC-correlated names `MSTRx` (RMSTRUSDT), `COINx` (RCOINUSDT) used by HEDGE and
+CLOSE-ONLY. `QQQx`/`SPYx` are index proxies.
 
-## Develop
+## Quickstart
 
 ```bash
 pnpm install
-pnpm typecheck && pnpm lint && pnpm test
-pnpm run:bitget-paper                  # run the reactor on real Bitget data (paper fills)
-pnpm console:bitget                    # interactive live console
-pnpm backtest:bitget                   # backtest over real historical candles
-pnpm verify:bitget-hub                 # prove the Agent Hub MCP integration end-to-end
-pnpm --filter @wardenclaw/web dev      # dashboard on http://localhost:3000
+pnpm typecheck && pnpm lint && pnpm test     # full suite
+
+# Firewall demos (paper / sim, screenshot-able)
+pnpm demo:bypass        # the executor cannot be reached around: 5 attempts, 4 refused
+pnpm demo:closeonly     # survival mode: "buy more" BLOCKED, "reduce 50%" APPROVED
+pnpm run:scorecard      # aggregate backtest evidence from real Bitget candles
+pnpm evidence:run       # full end-to-end native evidence transcript
+
+# Reactor / perception layer (real Bitget public data, paper fills)
+pnpm run:bitget-paper
+pnpm console:bitget
+pnpm backtest:bitget
+pnpm --filter @wardenclaw/web dev            # dashboard on http://localhost:3000
 ```
+
+## Bitget toolchain + MCP servers
+
+- **Agent Hub** wrappers (`packages/bitget-adapter/src/agentHub.ts`) and the official
+  Demo Trading executor (`demoExecutor.ts`, `paptrading:1`).
+- **Skill Hub** perception skills are declared as gate inputs in `docs/GATE_TABLE.md`
+  (sentiment-analyst, news-briefing, technical-analysis, macro-analyst).
+- **Bitget MCP server** (perception):
+  ```
+  claude mcp add -s user --env BITGET_API_KEY=$BITGET_API_KEY \
+    --env BITGET_SECRET_KEY=$BITGET_SECRET_KEY --env BITGET_PASSPHRASE=$BITGET_PASSPHRASE \
+    bitget -- npx -y bitget-mcp-server
+  ```
+- **WardenClaw MCP server** (the firewall itself) — register it so any agent must route
+  trade intent through it:
+  ```
+  claude mcp add -s user wardenclaw -- npx tsx scripts/warden-mcp-server.ts
+  ```
+  Tools: `audit_strategy`, `request_permit`, `verify_permit`, `get_card`,
+  `replay_card`, `get_closeonly_status`, `run_ghost_sim`.
+
+## What's implemented
+
+- **`packages/core`** — the deterministic engine: Signal Mandate schema + risk config,
+  friction/net-edge/volatility/drawdown primitives, Risk Constitution, watchdog,
+  hash-chained audit + replay, backtester, LLM provider layer (parsing only), and the
+  firewall modules: `playbookShield`, `wardenCard` (signing/chain), `tradePermit`
+  (verdicts + gates), `wardenPermit` (lifecycle), `wardenExecutor` (atomic hedge),
+  `closeOnlyWatcher`, `ghostSim`, `evidenceLog`, `mcpServer`.
+- **`packages/bitget-adapter`** — real public market data, the shock/cooldown reactor,
+  the internal paper engine, the event-shock ranker, the agent stack, the strategy
+  compiler clamp + the Playbook Shield wiring (`playbook.ts`), the Agent Hub MCP source,
+  and the backtest harness.
+- **`apps/web`** — the `/bitget` judge dashboard.
 
 ## Safety
 
-This is hackathon paper trading, not investment advice. The reactor never places real exchange
-orders: fills are simulated against real Bitget market data and are always labeled
-`internal_paper_engine`. Every trade decision produces a structured, replayable audit event.
+Hackathon paper trading, not investment advice. **No real-capital order on any code
+path, ever.** Fills are simulated against real Bitget market data and always labeled
+`PAPER` / `internal_paper_engine`. Every decision produces a structured, replayable,
+signed audit card.
 
 ## Environment
 
-Copy `.env.example` to `.env` and fill in the values you need. Every variable is documented inline.
-The agent runs with no LLM key (deterministic mode) and with no Bitget API key (public data only).
+Copy `.env.example` to `.env`. The firewall runs fully offline from fixtures with no
+keys (deterministic sim mode). `WARDEN_SIGNING_KEY` signs permits (a labeled dev key is
+used when absent). Bitget keys enable live perception and the official Demo Trading
+executor; absent, everything runs from cached fixtures.
+
+More docs: `docs/{ARCHITECTURE_AUDIT,PLAYBOOK_SHIELD,GATE_TABLE,DEMO_SCRIPT,SUBMISSION_BLURB,COMPLIANCE_CHECKLIST,SETUP,SAFETY,LLM_POLICY}.md`.
