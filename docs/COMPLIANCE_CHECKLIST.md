@@ -27,7 +27,7 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 | 1 | Strategy Safety Card (signed, chained) | ✅ | `wardenCard.ts`, `playbookShield.ts` |
 | 1 | Wiring: Reject blocks, Restrict tightens compiler caps | ✅ | `bitget-adapter/src/playbook.ts`, `test/playbook.test.ts` |
 | 2 | Six trade verdicts | ✅ | `tradePermit.ts` |
-| 2 | Ten deterministic gates incl. premium/discount + BTC corr | ✅ | `tradePermit.ts`, `docs/GATE_TABLE.md` |
+| 2 | Ten deterministic gates incl. premium/discount + BTC corr | ✅ | `packages/core/src/gates/` (one module per gate), composed by `tradePermit.ts`, `docs/GATE_TABLE.md` |
 | 2 | Six canonical acceptance fixtures | ✅ | `test/tradePermit.test.ts` |
 | 2 | Fail-closed branches, one test each | ✅ | `test/tradePermit.test.ts` |
 | 3 | Permit signature (HMAC), expiry, single-use, market-state binding, chain, canonical serialization | ✅ | `wardenPermit.ts`, `wardenCard.ts`, `test/wardenPermit.test.ts` |
@@ -44,19 +44,24 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 | 8.b | Studio-parity paper records (NAV marks, round-trips, early win-rate/profit-factor) | ✅ | `paperRecords.ts` (`buildPaperRecords`, `computePerformance`) + the `/bitget/records` page; win-rate/profit-factor surface from the first closed trip |
 | 9 | UI: verdict badges, Playbook panel, original-vs-adjusted comparison, verification panel, fail-closed banner | ✅ | `apps/web/app/bitget/firewall/page.tsx`, `components/firewall.tsx` (server-rendered from the real engine) |
 | 9 | UI extras: ghost-sim panel, scorecard summary view | ✅ | `/bitget/records` page (computed from real fixture candles + `output/scorecard.json`) |
-| 9 | UI extras: Bitget asset logos, separated backtest/live-NAV/price charts | 🟡 | minor presentational polish only — not yet |
-| Perception | Live Bitget perception wired into the gate inputs | ✅ | `marketContext.ts`, `scripts/verify-perception.ts` (proven against real public data) |
-| 10 | Full test suite | ✅ | 252 tests (174 core + 78 adapter) |
+| 9 | UI extras: separated backtest/live-NAV/price charts with execution markers | ✅ | price chart + execution markers (commit `43b8a81`) |
+| 9 | UI extras: Bitget asset logos | ⚠️ documented deviation | Bitget coins API exposes no logo URL and the image catalog is hotlink-protected (403, hashed filenames) — verified 2026-06-20; branded monogram retained with a `src` hook (`apps/web/components/asset-logo.tsx`). See `ARCHITECTURE_AUDIT.md §8.5` |
+| Perception | Live Bitget perception wired into the gate inputs | ✅ | `marketContext.ts`, `scripts/verify-perception.ts`; live `perception source: live_bitget_agent_hub_mcp` on the VPS |
+| Hardening | Transient 429 retry (REST + MCP), deterministic news fallback | ✅ | `retry.ts`, `mcpMarketData.ts`, `newsFeed.classifyNewsDeterministic`; see `ARCHITECTURE_AUDIT.md §8` |
+| 10 | Full test suite | ✅ | 281 tests (174 core + 107 adapter) |
 | 10 | Docs (README, GATE_TABLE, PLAYBOOK_SHIELD) | ✅ | `README.md`, `docs/GATE_TABLE.md`, `docs/PLAYBOOK_SHIELD.md` |
 | 10 | Demo kit + submission blurb + this checklist | ✅ | `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_BLURB.md`, this file |
 
 ## Outstanding work (honest)
 
-Only minor presentational polish remains: **Bitget asset logos** (use the public
-coin-logo catalog) and **separated backtest / live-NAV / symbol-price charts** with
-execution markers. Everything else in the spec is implemented.
+One **documented deviation** remains: **Bitget asset logos**. Bitget's public coins
+API returns no logo URL and the image catalog is hotlink-protected (403, hashed
+filenames), so there is no reliable symbol→URL mapping to embed; we ship a branded
+monogram with a `src` hook for a future catalog URL (see `ARCHITECTURE_AUDIT.md §8.5`).
+Everything else in the spec is implemented.
 
 The two checkpoints, signed permits, the executor + atomic hedge, the close-only
 watcher, ghost-sim + scorecard, the MCP server, native evidence + studio-parity paper
-records, live Bitget perception wiring, and the firewall + records UI are complete,
-tested (265 tests), and verified running on the deployment VPS.
+records, live Bitget perception wiring (live Agent Hub MCP source, with 429-retry
+hardening and a deterministic news-classifier fallback), and the firewall + records UI
+are complete, tested (281 tests), and verified running on the deployment VPS.

@@ -156,3 +156,56 @@ Implemented in `packages/bitget-adapter/src/universe.ts` (`XSTOCK_UNIVERSE`,
 Paper/sim only · deterministic verdicts · fail-closed · no narrated numbers (every
 figure computed from real Bitget candles cached to fixtures) · Bitget-native tools &
 data · 6 trade verdicts / 3 strategy verdicts / 5 assets · upgrade in place.
+
+## 8. Decisions log (2026-06-20 hardening pass)
+
+Recorded per the build doctrine — adapt to the repo and never silently drop a
+requirement.
+
+1. **Trade-Permit gates extracted to `packages/core/src/gates/` (one module per
+   gate).** Phase 2.b calls for `src/gates/`, one module per gate. The gates had
+   been correct but consolidated in `tradePermit.ts`. They are now one file each
+   (`dataStaleness.ts`, `knownAsset.ts`, `earningsWindow.ts`, `volatilityRegime.ts`,
+   `spreadSlippage.ts`, `liquidationDistance.ts`, `confirmation.ts`,
+   `newsFirstSpike.ts`, `marketSession.ts`, `premiumDiscount.ts`,
+   `btcCorrelation.ts`) over a shared `gates/shared.ts` (types, config, `ok`/`hit`
+   helpers). `gates/index.ts` exposes `runTradeGates`; `tradePermit.ts` composes
+   them into the six-way verdict and re-exports the surface, so the public API and
+   all tests are unchanged. Thresholds still live in one config (`TradePermitConfig`).
+
+2. **Transient HTTP-429 retry hardening.** Bitget rate-limits bursts when polling
+   several symbols per cycle. Added `bitget-adapter/src/retry.ts` (`withRetry`,
+   exponential backoff + jitter, injectable sleep) and wired it into BOTH market
+   sources: `BitgetPublicMarketData` (REST) and `BitgetMcpMarketData` (Agent Hub
+   MCP). Only HTTP 429 and network blips are retried; every other error (4xx, Bitget
+   error codes, empty payloads) still fails loudly on the first try — fail-closed is
+   preserved, nothing is ever fabricated. Tested in `test/retry.test.ts`.
+
+3. **Deterministic news-classifier fallback.** The LLM news classifier requires a
+   funded key; when it is disabled or quota-exhausted the perception layer previously
+   logged headlines as "(unclassified)". Added `classifyNewsDeterministic` — a
+   transparent, reproducible keyword lexicon over the SAME real headlines — wired
+   into `CachedNewsScanner` as an **opt-in** fallback (`deterministicFallback`,
+   enabled by the paper runner via `BITGET_NEWS_DETERMINISTIC_FALLBACK`). It only
+   CLASSIFIES fetched text (never invents news/prices) and never makes a risk
+   decision — the deterministic permit gates still own every verdict. Output is
+   labelled `deterministic` vs `llm` so the two are never confused. Default remains
+   honest-absence when not opted in. Tested in `test/newsFeed.test.ts`.
+
+4. **Perception runs the Agent Hub MCP server in public read-only mode.** The
+   authenticated MCP startup intermittently exceeded the 20s initialize handshake and
+   triggered 429s; perception reads only public market data, so credentials were
+   dropped (commit `4af5dbc`). Deployed and confirmed live: `perception source:
+   live_bitget_agent_hub_mcp`, all five symbols evaluated, public-REST fallback
+   retained as defense in depth.
+
+5. **Asset logos — Bitget catalog not hotlinkable, monogram retained (documented
+   deviation).** Phase 9.7 asks for the Bitget public coin-logo catalog. Verified on
+   2026-06-20 that Bitget's public coins API (`GET /api/v2/spot/public/coins`)
+   returns no icon/logo URL field (only `coinId`/`chains`), and the image catalog is
+   hotlink-protected (cross-origin 403) with hashed, non-symbol filenames — so there
+   is no reliable symbol→URL mapping to embed. Shipping those URLs would 403 in
+   production. We therefore keep the deterministic, branded **monogram**
+   (`apps/web/components/asset-logo.tsx`), which carries a `src` hook to adopt a real
+   catalog URL if one ever becomes reliably available. This is a justified deviation,
+   not a dropped requirement.

@@ -9,6 +9,7 @@
  */
 
 import type { BitgetCandle, BitgetTicker } from "./types.js";
+import { withRetry } from "./retry.js";
 
 export type FetchLike = (
   url: string,
@@ -20,6 +21,16 @@ export interface BitgetMarketDataOptions {
   baseUrl?: string;
   /** Injectable fetch (defaults to global fetch when available). */
   fetchImpl?: FetchLike;
+  /**
+   * Transient-failure retry budget for HTTP 429 / network blips (default 3).
+   * Set to 0 to disable. Real errors (4xx other than 429, Bitget error codes,
+   * empty payloads) are never retried — they fail loudly on the first try.
+   */
+  retries?: number;
+  /** Base backoff in ms for the retry (default 400). */
+  retryBaseDelayMs?: number;
+  /** Injectable sleep so tests don't wait on real timers. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export class BitgetApiError extends Error {
@@ -57,6 +68,9 @@ export class BitgetPublicMarketData implements MarketDataSource {
   readonly mode = "live_bitget_public" as const;
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
+  private readonly retries: number;
+  private readonly retryBaseDelayMs: number;
+  private readonly sleep?: (ms: number) => Promise<void>;
 
   constructor(opts: BitgetMarketDataOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? "https://api.bitget.com").replace(/\/$/, "");
@@ -67,13 +81,25 @@ export class BitgetPublicMarketData implements MarketDataSource {
       );
     }
     this.fetchImpl = f;
+    this.retries = opts.retries ?? 3;
+    this.retryBaseDelayMs = opts.retryBaseDelayMs ?? 400;
+    this.sleep = opts.sleep;
   }
 
-  private async get(path: string): Promise<unknown> {
+  /** Only transient failures are retryable: HTTP 429 and network errors. */
+  private static retryable(err: unknown): boolean {
+    if (err instanceof BitgetApiError) {
+      return err.status === 429 || err.status === undefined;
+    }
+    return false;
+  }
+
+  private async getOnce(path: string): Promise<unknown> {
     let res: Awaited<ReturnType<FetchLike>>;
     try {
       res = await this.fetchImpl(`${this.baseUrl}${path}`, { method: "GET" });
     } catch (err) {
+      // Network-level failure — no HTTP status; retryable.
       throw new BitgetApiError(`Bitget request failed: ${(err as Error).message}`);
     }
     if (!res.ok) {
@@ -88,6 +114,15 @@ export class BitgetPublicMarketData implements MarketDataSource {
       );
     }
     return body.data;
+  }
+
+  private async get(path: string): Promise<unknown> {
+    return withRetry(() => this.getOnce(path), {
+      retries: this.retries,
+      baseDelayMs: this.retryBaseDelayMs,
+      shouldRetry: BitgetPublicMarketData.retryable,
+      sleep: this.sleep,
+    });
   }
 
   async getTicker(symbol: string): Promise<BitgetTicker> {

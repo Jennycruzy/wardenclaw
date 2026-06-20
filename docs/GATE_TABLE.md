@@ -3,8 +3,8 @@
 Checkpoint 2 of the firewall. Each TRADE command (parsed into a structured intent by
 the LLM layer — **parsing only, never risk**) runs through these ten deterministic
 gates. Every gate returns `{gate, passed, value, threshold, effect, reason}`. All
-thresholds live in one config: `TradePermitConfig` (`packages/core/src/tradePermit.ts`,
-`DEFAULT_TRADE_PERMIT_CONFIG`). The LLM never decides a verdict.
+thresholds live in one config: `TradePermitConfig` (`packages/core/src/gates/shared.ts`,
+`DEFAULT_TRADE_PERMIT_CONFIG`; re-exported from `tradePermit.ts`). The LLM never decides a verdict.
 
 | Gate | Input source (skill / API) | Default threshold | Effect |
 |---|---|---|---|
@@ -71,7 +71,13 @@ Prove it live (real public data, no keys): `pnpm verify:perception`.
 
 ## Code & tests
 
-- `packages/core/src/tradePermit.ts` — the gates, the config, and `evaluateTradePermit`.
+- `packages/core/src/gates/` — **one module per gate** (`dataStaleness.ts`,
+  `knownAsset.ts`, `earningsWindow.ts`, `volatilityRegime.ts`, `spreadSlippage.ts`,
+  `liquidationDistance.ts`, `confirmation.ts`, `newsFirstSpike.ts`, `marketSession.ts`,
+  `premiumDiscount.ts`, `btcCorrelation.ts`) over a shared `gates/shared.ts`
+  (`TradePermitConfig`, `GateResult`, `ok`/`hit`). `gates/index.ts` exports `runTradeGates`.
+- `packages/core/src/tradePermit.ts` — composes the gates into `evaluateTradePermit`
+  (the six-way verdict + order rewrite) and re-exports the gate surface.
 - `packages/core/test/tradePermit.test.ts` — the six canonical acceptance fixtures, the
   fail-closed branches, and per-gate threshold tests.
 - `packages/bitget-adapter/src/marketContext.ts` + `test/marketContext.test.ts` — the

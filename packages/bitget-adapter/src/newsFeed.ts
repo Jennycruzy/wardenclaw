@@ -196,6 +196,88 @@ export function buildClassifierUser(asset: string, items: NewsItem[]): string {
   );
 }
 
+// ── Deterministic lexicon classifier (no LLM, fully reproducible) ───────────────
+//
+// When the LLM classifier is unavailable (disabled or quota-exhausted) the system
+// must still run offline (a stated non-negotiable). This is a transparent,
+// reproducible keyword classifier over the SAME real headlines the LLM would read:
+// it counts directional signal words, and every output is a computed function of
+// those counts — no narrated numbers, no fabricated facts. It is clearly labelled
+// `deterministic` so it is never mistaken for the richer LLM read, and like the LLM
+// it only CLASSIFIES fetched text; it never invents a headline or a price, and it
+// never makes a risk decision (the deterministic permit gates do that).
+
+const POSITIVE_WORDS = [
+  "beat", "beats", "surge", "surges", "soar", "soars", "rally", "rallies", "jump", "jumps",
+  "gain", "gains", "upgrade", "upgraded", "raise", "raises", "raised", "record", "strong",
+  "outperform", "profit", "bullish", "tops", "growth", "expands", "win", "wins", "approval",
+  "partnership", "buyback", "rebound", "boost", "boosts", "high", "higher", "upbeat",
+];
+const NEGATIVE_WORDS = [
+  "miss", "misses", "missed", "plunge", "plunges", "plummet", "fall", "falls", "drop", "drops",
+  "slump", "slumps", "downgrade", "downgraded", "cut", "cuts", "lawsuit", "probe", "investigation",
+  "recall", "warning", "warns", "weak", "loss", "losses", "bearish", "decline", "declines",
+  "layoff", "layoffs", "fraud", "halt", "halts", "slowdown", "sink", "sinks", "lower", "tumble",
+];
+const RUMOR_WORDS = ["rumor", "rumour", "reportedly", "speculation", "speculative", "unconfirmed", "sources say"];
+const EARNINGS_WORDS = ["earnings", "quarterly", "results", "revenue", "eps", "guidance", "forecast", "outlook"];
+
+const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
+const countHits = (text: string, words: string[]): number =>
+  words.reduce((acc, w) => (text.includes(w) ? acc + 1 : acc), 0);
+
+/**
+ * Classify a set of real headlines into a NewsSentiment using a deterministic
+ * lexicon. Same shape as the LLM classifier so it is a drop-in fallback.
+ */
+export function classifyNewsDeterministic(asset: string, items: NewsItem[]): NewsSentiment {
+  const corpus = items.map((n) => ` ${n.headline} ${n.body ?? ""} `.toLowerCase()).join(" ");
+  const pos = countHits(corpus, POSITIVE_WORDS);
+  const neg = countHits(corpus, NEGATIVE_WORDS);
+  const total = pos + neg;
+  const net = pos - neg;
+  const rumor = countHits(corpus, RUMOR_WORDS) > 0;
+  const earnings = countHits(corpus, EARNINGS_WORDS) > 0;
+
+  let direction: NewsSentiment["direction"];
+  if (total === 0) direction = "neutral";
+  else if (pos > 0 && neg > 0 && Math.abs(net) <= 1) direction = "mixed";
+  else if (net > 0) direction = "positive";
+  else if (net < 0) direction = "negative";
+  else direction = "mixed";
+
+  // Confidence is a computed function of signal strength, deliberately capped well
+  // below the LLM's range so a heuristic read never overstates its certainty.
+  const strength = total === 0 ? 0 : Math.abs(net) / total;
+  const confidence =
+    total === 0 ? 0.2 : direction === "mixed" ? 0.4 : clamp(0.35 + 0.45 * strength, 0.35, 0.8);
+
+  const eventType: NewsSentiment["eventType"] = earnings
+    ? "earnings"
+    : rumor
+      ? "rumor"
+      : total > 0
+        ? "major_news"
+        : "unknown";
+
+  const tradeRelevance: NewsSentiment["tradeRelevance"] = total >= 3 ? "high" : total >= 1 ? "medium" : "low";
+
+  const riskFlags = ["deterministic_lexicon"];
+  if (rumor) riskFlags.push("rumor", "unverified");
+  if (pos > 0 && neg > 0) riskFlags.push("conflicting_sources");
+
+  return {
+    asset,
+    eventType,
+    direction,
+    confidence: Number(confidence.toFixed(2)),
+    summary: `Deterministic lexicon over ${items.length} headline(s): ${pos} positive / ${neg} negative signal word(s).`,
+    tradeRelevance,
+    riskFlags,
+    sourceRefs: items.slice(0, 5).map((n) => n.url ?? n.id),
+  };
+}
+
 /** Map a validated NewsSentiment into the reactor's ClassifiedEvent. */
 export function sentimentToEvent(s: NewsSentiment): ClassifiedEvent {
   return {
@@ -209,16 +291,24 @@ export function sentimentToEvent(s: NewsSentiment): ClassifiedEvent {
 export interface ScannedNews {
   asset: string;
   items: NewsItem[];
-  /** Present only when an enabled LLM classified real headlines. */
+  /** Present when an enabled LLM or the deterministic fallback classified headlines. */
   event?: ClassifiedEvent;
   /** Classifier summary for display (never feeds the engine). */
   summary?: string;
+  /** Which classifier produced `event` (absent when there is no event). */
+  source?: "llm" | "deterministic";
   fetchedAt: string;
 }
 
 export interface CachedNewsScannerOptions {
   /** Re-fetch/classify no more often than this (default 300s). */
   ttlSeconds?: number;
+  /**
+   * When the LLM classifier is disabled or fails, classify the SAME real headlines
+   * with the deterministic lexicon (so the system still runs offline) instead of
+   * leaving the event absent. Default false — absence stays honest unless opted in.
+   */
+  deterministicFallback?: boolean;
 }
 
 /**
@@ -229,6 +319,7 @@ export interface CachedNewsScannerOptions {
 export class CachedNewsScanner {
   private readonly cache = new Map<string, ScannedNews>();
   private readonly ttlMs: number;
+  private readonly deterministicFallback: boolean;
   lastError: string | null = null;
 
   constructor(
@@ -237,6 +328,7 @@ export class CachedNewsScanner {
     opts: CachedNewsScannerOptions = {},
   ) {
     this.ttlMs = (opts.ttlSeconds ?? 300) * 1000;
+    this.deterministicFallback = opts.deterministicFallback ?? false;
   }
 
   get classifierEnabled(): boolean {
@@ -260,12 +352,21 @@ export class CachedNewsScanner {
         });
         scanned.event = sentimentToEvent(s);
         scanned.summary = s.summary;
+        scanned.source = "llm";
         this.lastError = null;
       } catch (err) {
         if (!(err instanceof LlmDisabledError)) {
-          // Real classifier failure: surface it; the reactor runs without an
-          // event (deterministic gates only) rather than with a fabricated one.
+          // Real classifier failure (e.g. quota exhausted): surface it.
           this.lastError = (err as Error).message;
+        }
+        // Fall back to the deterministic lexicon when opted in, so the perception
+        // layer still classifies offline; otherwise leave the event honestly absent
+        // and let the reactor run on its deterministic gates only.
+        if (this.deterministicFallback) {
+          const s = classifyNewsDeterministic(asset, items);
+          scanned.event = sentimentToEvent(s);
+          scanned.summary = s.summary;
+          scanned.source = "deterministic";
         }
       }
     }

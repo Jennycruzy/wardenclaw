@@ -207,13 +207,18 @@ async function main(): Promise<void> {
   let newsScanner: CachedNewsScanner | null = null;
   if (process.env.BITGET_NEWS_FEED !== "false") {
     const llm = createLlmProvider(process.env, process.env.NEWS_SENTIMENT_MODEL || undefined);
+    // Deterministic lexicon fallback keeps the perception layer classifying real
+    // headlines even when the LLM is disabled or quota-exhausted (opt out with
+    // BITGET_NEWS_DETERMINISTIC_FALLBACK=false). It never makes a risk decision.
+    const deterministicFallback = process.env.BITGET_NEWS_DETERMINISTIC_FALLBACK !== "false";
     newsScanner = new CachedNewsScanner(new YahooFinanceNewsFeed(), llm, {
       ttlSeconds: Number(process.env.BITGET_NEWS_TTL_SECONDS ?? "300"),
+      deterministicFallback,
     });
     console.log(
       `[bitget] news feed: yahoo_finance_rss · classifier: ${
-        newsScanner.classifierEnabled ? llm.name : "disabled (no event, deterministic gates only)"
-      }`,
+        newsScanner.classifierEnabled ? llm.name : "llm disabled"
+      }${deterministicFallback ? " · deterministic lexicon fallback ON" : " · no fallback (honest absence)"}`,
     );
   }
 
@@ -271,7 +276,9 @@ async function main(): Promise<void> {
             if (scanned.items.length > 0) {
               console.log(
                 `[bitget] ${sym.display} news: ${scanned.items.length} real headlines` +
-                  (event ? ` → ${event.direction} (${(event.confidence * 100).toFixed(0)}%)` : " (unclassified)"),
+                  (event
+                    ? ` → ${event.direction} (${(event.confidence * 100).toFixed(0)}%) [${scanned.source}]`
+                    : " (unclassified)"),
               );
             }
             if (newsScanner.lastError) {

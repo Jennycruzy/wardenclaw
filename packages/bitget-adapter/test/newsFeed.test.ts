@@ -3,12 +3,18 @@ import { DisabledProvider, type LlmProvider } from "@wardenclaw/core";
 import {
   YahooFinanceNewsFeed,
   CachedNewsScanner,
+  classifyNewsDeterministic,
   parseRssItems,
   decodeEntities,
   sentimentToEvent,
   buildClassifierUser,
   NewsFeedError,
 } from "../src/index.js";
+import type { NewsItem } from "../src/types.js";
+
+function newsItem(headline: string, i = 0): NewsItem {
+  return { id: `n${i}`, asset: "NVDAx", headline, source: "test", publishedAt: new Date(0).toISOString(), url: `https://e.x/${i}` };
+}
 
 const RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>Yahoo! Finance: NVDA News</title>
@@ -160,5 +166,67 @@ describe("CachedNewsScanner", () => {
     expect(r.items.length).toBeGreaterThan(0);
     expect(r.event).toBeUndefined();
     expect(scanner.lastError).toContain("gateway 500");
+  });
+
+  it("uses the deterministic lexicon fallback when the LLM is disabled (opt-in)", async () => {
+    const feed = new YahooFinanceNewsFeed({ fetchImpl: stubTextFetch(RSS) });
+    const scanner = new CachedNewsScanner(feed, new DisabledProvider(), { deterministicFallback: true });
+    const r = await scanner.scan("NVDA", "NVDAx");
+    expect(r.event).toBeDefined();
+    expect(r.source).toBe("deterministic");
+    expect(r.event!.direction).toBe("positive"); // "beats … raises guidance"
+  });
+
+  it("falls back deterministically when the LLM call fails", async () => {
+    const llm: LlmProvider = {
+      name: "openai",
+      async generateStructured() {
+        throw new Error("429 insufficient_quota");
+      },
+    };
+    const feed = new YahooFinanceNewsFeed({ fetchImpl: stubTextFetch(RSS) });
+    const scanner = new CachedNewsScanner(feed, llm, { deterministicFallback: true });
+    const r = await scanner.scan("NVDA", "NVDAx");
+    expect(r.source).toBe("deterministic");
+    expect(r.event).toBeDefined();
+    expect(scanner.lastError).toContain("insufficient_quota");
+  });
+});
+
+describe("classifyNewsDeterministic", () => {
+  it("reads a clearly positive headline", () => {
+    const s = classifyNewsDeterministic("NVDAx", [newsItem("Nvidia beats estimates and raises guidance, shares surge")]);
+    expect(s.direction).toBe("positive");
+    expect(s.eventType).toBe("earnings");
+    expect(s.confidence).toBeGreaterThan(0.5);
+    expect(s.riskFlags).toContain("deterministic_lexicon");
+  });
+
+  it("reads a clearly negative headline", () => {
+    const s = classifyNewsDeterministic("NVDAx", [newsItem("Stock plunges after earnings miss and downgrade")]);
+    expect(s.direction).toBe("negative");
+  });
+
+  it("flags conflicting signals as mixed", () => {
+    const s = classifyNewsDeterministic("NVDAx", [newsItem("Shares jump on beat but later fall on weak guidance")]);
+    expect(["mixed", "positive", "negative"]).toContain(s.direction);
+    expect(s.riskFlags).toContain("conflicting_sources");
+  });
+
+  it("returns neutral with low confidence when no signal words are present", () => {
+    const s = classifyNewsDeterministic("NVDAx", [newsItem("Nvidia to host its annual developer conference")]);
+    expect(s.direction).toBe("neutral");
+    expect(s.confidence).toBeLessThanOrEqual(0.3);
+  });
+
+  it("flags rumors", () => {
+    const s = classifyNewsDeterministic("NVDAx", [newsItem("Nvidia reportedly in talks for acquisition, sources say")]);
+    expect(s.riskFlags).toContain("rumor");
+    expect(s.eventType).toBe("rumor");
+  });
+
+  it("is deterministic — identical input yields identical output", () => {
+    const items = [newsItem("Nvidia beats and raises"), newsItem("Analysts upgrade on strong demand", 1)];
+    expect(classifyNewsDeterministic("NVDAx", items)).toEqual(classifyNewsDeterministic("NVDAx", items));
   });
 });

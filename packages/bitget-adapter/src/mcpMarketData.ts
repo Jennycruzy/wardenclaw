@@ -16,6 +16,7 @@
 
 import type { BitgetCandle, BitgetTicker } from "./types.js";
 import { BitgetApiError, type MarketDataSource } from "./marketData.js";
+import { withRetry } from "./retry.js";
 
 /** Minimal tool-calling surface — satisfied by BitgetMcpClient; fakeable in tests. */
 export interface McpToolCaller {
@@ -26,6 +27,17 @@ interface McpEnvelope {
   tool?: string;
   ok?: boolean;
   data?: { endpoint?: string; requestTime?: string; data?: unknown };
+  /** Present when a tool call fails — surfaces Bitget's underlying error code. */
+  error?: { type?: string; code?: string; message?: string; suggestion?: string };
+}
+
+export interface BitgetMcpMarketDataOptions {
+  /** Transient 429 retry budget (default 3). Set 0 to disable. */
+  retries?: number;
+  /** Base backoff in ms (default 400). */
+  retryBaseDelayMs?: number;
+  /** Injectable sleep so tests don't wait on real timers. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 function num(v: unknown, field: string): number {
@@ -39,19 +51,50 @@ function num(v: unknown, field: string): number {
 /** Unwrap the MCP tool envelope down to the underlying Bitget `data` payload. */
 function unwrap(env: McpEnvelope, tool: string): unknown {
   if (!env || env.ok !== true) {
-    throw new BitgetApiError(`Bitget MCP tool ${tool} did not succeed (ok=${env?.ok})`);
+    const code = env?.error?.code;
+    // status carries the underlying HTTP code (e.g. 429) so the retry layer can
+    // distinguish a transient rate-limit from a permanent failure.
+    const status = code !== undefined && /^\d+$/.test(code) ? Number(code) : undefined;
+    const detail = env?.error?.message ? `: ${env.error.message}` : "";
+    throw new BitgetApiError(
+      `Bitget MCP tool ${tool} did not succeed (ok=${env?.ok}${code ? `, code=${code}` : ""})${detail}`,
+      status,
+      code,
+    );
   }
   return env.data?.data;
 }
 
 export class BitgetMcpMarketData implements MarketDataSource {
   readonly mode = "live_bitget_agent_hub_mcp" as const;
+  private readonly retries: number;
+  private readonly retryBaseDelayMs: number;
+  private readonly sleep?: (ms: number) => Promise<void>;
 
-  constructor(private readonly client: McpToolCaller) {}
+  constructor(
+    private readonly client: McpToolCaller,
+    opts: BitgetMcpMarketDataOptions = {},
+  ) {
+    this.retries = opts.retries ?? 3;
+    this.retryBaseDelayMs = opts.retryBaseDelayMs ?? 400;
+    this.sleep = opts.sleep;
+  }
+
+  /** Call a tool and unwrap it, retrying only on a transient HTTP 429. */
+  private async call(tool: string, args: Record<string, unknown>): Promise<unknown> {
+    return withRetry(
+      async () => unwrap(await this.client.callTool<McpEnvelope>(tool, args), tool),
+      {
+        retries: this.retries,
+        baseDelayMs: this.retryBaseDelayMs,
+        shouldRetry: (err) => err instanceof BitgetApiError && err.status === 429,
+        sleep: this.sleep,
+      },
+    );
+  }
 
   async getTicker(symbol: string): Promise<BitgetTicker> {
-    const env = await this.client.callTool<McpEnvelope>("spot_get_ticker", { symbol });
-    const rows = unwrap(env, "spot_get_ticker");
+    const rows = await this.call("spot_get_ticker", { symbol });
     const row = (Array.isArray(rows) ? rows[0] : undefined) as Record<string, unknown> | undefined;
     if (!row) {
       throw new BitgetApiError(
@@ -70,12 +113,7 @@ export class BitgetMcpMarketData implements MarketDataSource {
   }
 
   async getCandles(symbol: string, granularity: string, limit: number): Promise<BitgetCandle[]> {
-    const env = await this.client.callTool<McpEnvelope>("spot_get_candles", {
-      symbol,
-      granularity,
-      limit,
-    });
-    const rows = unwrap(env, "spot_get_candles");
+    const rows = await this.call("spot_get_candles", { symbol, granularity, limit });
     const list = Array.isArray(rows) ? rows : [];
     if (list.length === 0) {
       throw new BitgetApiError(`No candles via Agent Hub MCP for ${symbol} @ ${granularity}.`);

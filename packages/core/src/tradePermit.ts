@@ -16,250 +16,29 @@
  * Every gate returns {gate, passed, value, threshold, effect, reason}. All
  * thresholds live in TradePermitConfig. Verdict precedence (most severe first):
  *   CLOSE_ONLY(context) > BLOCK > DELAY > HEDGE > REDUCE > APPROVE.
+ *
+ * The gates themselves live one-module-per-gate under ./gates/ (per the spec);
+ * this module composes them into the six-way verdict and rewrites orders. The gate
+ * primitives, types, config, and every gate are re-exported below so existing
+ * imports from "@wardenclaw/core" / "./tradePermit.js" keep resolving unchanged.
  */
 
-export type TradeVerdict = "APPROVE" | "REDUCE" | "DELAY" | "HEDGE" | "BLOCK" | "CLOSE_ONLY";
+import {
+  DEFAULT_TRADE_PERMIT_CONFIG,
+  type GateEffect,
+  type GateResult,
+  type MarketContext,
+  type TradeDirection,
+  type TradeIntent,
+  type TradePermitConfig,
+  type TradeVerdict,
+  isIncrease,
+  runTradeGates,
+} from "./gates/index.js";
 
-/** What a gate pushes the verdict toward. `tighten` folds into REDUCE. */
-export type GateEffect = "none" | "reduce" | "delay" | "hedge" | "block";
-
-export type TradeDirection = "long" | "short" | "reduce" | "close" | "cancel";
-
-/** A structured trade command (NL parsed by the LLM layer upstream). */
-export interface TradeIntent {
-  asset: string;
-  direction: TradeDirection;
-  notionalUsd: number;
-  leverage: number;
-  orderType: "market" | "limit";
-  limitPrice?: number;
-  triggerSource: "human" | "ai_agent";
-  rawCommand: string;
-}
-
-/** Deterministic gate inputs, each sourced from a declared skill/API (see GATE_TABLE.md). */
-export interface MarketContext {
-  nowIso: string;
-  /** Whether the asset is a known, tradeable universe member. */
-  knownAsset: boolean;
-  /** Whether the asset trades with the BTC complex (drives the HEDGE gate). */
-  btcCorrelated: boolean;
-  /** Current xStock mid price. */
-  price: number;
-  /** Reference/last-close of the underlying equity, for premium/discount. */
-  underlyingRefPrice?: number;
-  /** Orderbook spread in bps. */
-  spreadBps: number;
-  /** Realized/ATR volatility percentile over 90d (0..1). */
-  volPctile: number;
-  /** Hours to the nearest earnings event (absolute); undefined if none near. */
-  earningsWithinHours?: number;
-  /** Minutes since the last news shock; undefined when no recent shock. */
-  newsShockAgeMin?: number;
-  /** Whether post-news volume/candle confirmation is present. */
-  confirmationPresent: boolean;
-  /** NYSE session open? */
-  marketOpen: boolean;
-  /** BTC realized vol rising (macro-analyst). */
-  btcRealizedVolRising: boolean;
-  /** Max age (sec) of any required feed — staleness. */
-  feedAgeSec: number;
-  /** Account-level survival mode set by the close-only watcher. */
-  closeOnlyActive?: boolean;
-}
-
-export interface TradePermitConfig {
-  earningsWindowHours: number;
-  earningsBlockLeverage: number;
-  volHighPctile: number;
-  volReduceFraction: number;
-  volLeverageCap: number;
-  spreadMaxBps: number;
-  minLiquidationDistancePct: number;
-  liqBlockDistancePct: number;
-  maintenanceMarginRate: number;
-  newsFirstSpikeMinutes: number;
-  premiumReducePct: number;
-  premiumDelayPct: number;
-  feedMaxAgeSec: number;
-  hardMaxLeverage: number;
-  /** When market is closed, tighten the premium gate to this (lower) threshold. */
-  closedSessionPremiumReducePct: number;
-}
-
-export const DEFAULT_TRADE_PERMIT_CONFIG: TradePermitConfig = {
-  earningsWindowHours: 48,
-  earningsBlockLeverage: 2,
-  volHighPctile: 0.8,
-  volReduceFraction: 0.5,
-  volLeverageCap: 2,
-  spreadMaxBps: 50,
-  minLiquidationDistancePct: 8,
-  liqBlockDistancePct: 4,
-  maintenanceMarginRate: 0.005,
-  newsFirstSpikeMinutes: 15,
-  premiumReducePct: 1.5,
-  premiumDelayPct: 3,
-  feedMaxAgeSec: 60,
-  hardMaxLeverage: 3,
-  closedSessionPremiumReducePct: 0.75,
-};
-
-export interface GateResult {
-  gate: string;
-  passed: boolean;
-  value: number | string | boolean;
-  threshold: number | string | boolean;
-  effect: GateEffect;
-  reason: string;
-}
-
-const ok = (gate: string, value: GateResult["value"], threshold: GateResult["threshold"], reason: string): GateResult =>
-  ({ gate, passed: true, value, threshold, effect: "none", reason });
-
-const hit = (
-  gate: string,
-  effect: GateEffect,
-  value: GateResult["value"],
-  threshold: GateResult["threshold"],
-  reason: string,
-): GateResult => ({ gate, passed: false, value, threshold, effect, reason });
-
-const isIncrease = (d: TradeDirection): boolean => d === "long" || d === "short";
-
-/** Liquidation distance (%) for a leveraged long; spot (≤1x) is effectively safe. */
-export function liquidationDistancePct(leverage: number, maintenanceMarginRate: number): number {
-  if (leverage <= 1) return 100;
-  return Math.max(0, (1 / leverage - maintenanceMarginRate) * 100);
-}
-
-/** Signed premium/discount (%) of the xStock vs the underlying reference. */
-export function premiumPct(price: number, underlyingRefPrice: number | undefined): number | undefined {
-  if (underlyingRefPrice === undefined || underlyingRefPrice <= 0) return undefined;
-  return ((price - underlyingRefPrice) / underlyingRefPrice) * 100;
-}
-
-// ---- the ten gates (one function each) ----------------------------------------
-
-export function gateDataStaleness(ctx: MarketContext, cfg: TradePermitConfig): GateResult {
-  if (ctx.feedAgeSec > cfg.feedMaxAgeSec) {
-    return hit("data_staleness", "block", ctx.feedAgeSec, cfg.feedMaxAgeSec, "required feed is stale — fail-closed");
-  }
-  return ok("data_staleness", ctx.feedAgeSec, cfg.feedMaxAgeSec, "feeds fresh");
-}
-
-export function gateKnownAsset(ctx: MarketContext): GateResult {
-  if (!ctx.knownAsset) return hit("known_asset", "block", false, true, "unknown asset — fail-closed");
-  return ok("known_asset", true, true, "asset in verified universe");
-}
-
-export function gateEarningsWindow(intent: TradeIntent, ctx: MarketContext, cfg: TradePermitConfig): GateResult {
-  const h = ctx.earningsWithinHours;
-  if (h === undefined || h > cfg.earningsWindowHours) {
-    return ok("earnings_window", h ?? "none", `±${cfg.earningsWindowHours}h`, "outside earnings window");
-  }
-  if (intent.leverage > cfg.earningsBlockLeverage) {
-    return hit("earnings_window", "block", `${h}h @ ${intent.leverage}x`, `>${cfg.earningsBlockLeverage}x in window`,
-      `within ±${cfg.earningsWindowHours}h of earnings at ${intent.leverage}x — blocked`);
-  }
-  return hit("earnings_window", "reduce", `${h}h`, `±${cfg.earningsWindowHours}h`,
-    `within ±${cfg.earningsWindowHours}h of earnings — reduce exposure`);
-}
-
-export function gateVolatilityRegime(ctx: MarketContext, cfg: TradePermitConfig): GateResult {
-  if (ctx.volPctile > cfg.volHighPctile) {
-    return hit("volatility_regime", "reduce", ctx.volPctile, cfg.volHighPctile,
-      `volatility ${(ctx.volPctile * 100).toFixed(0)}th pct > ${(cfg.volHighPctile * 100).toFixed(0)}th — reduce ≥50%, cap leverage`);
-  }
-  return ok("volatility_regime", ctx.volPctile, cfg.volHighPctile, "volatility normal");
-}
-
-export function gateSpreadSlippage(ctx: MarketContext, cfg: TradePermitConfig): GateResult {
-  if (ctx.spreadBps > cfg.spreadMaxBps) {
-    return hit("spread_slippage", "delay", ctx.spreadBps, cfg.spreadMaxBps,
-      `spread ${ctx.spreadBps}bps > ${cfg.spreadMaxBps}bps — delay for liquidity`);
-  }
-  return ok("spread_slippage", ctx.spreadBps, cfg.spreadMaxBps, "spread normal");
-}
-
-export function gateLiquidationDistance(intent: TradeIntent, cfg: TradePermitConfig): GateResult {
-  if (!isIncrease(intent.direction)) return ok("liquidation_distance", "n/a", `${cfg.minLiquidationDistancePct}%`, "risk-reducing action");
-  const dist = liquidationDistancePct(intent.leverage, cfg.maintenanceMarginRate);
-  if (dist < cfg.liqBlockDistancePct) {
-    return hit("liquidation_distance", "block", Number(dist.toFixed(2)), cfg.liqBlockDistancePct,
-      `liquidation distance ${dist.toFixed(1)}% < ${cfg.liqBlockDistancePct}% — blocked`);
-  }
-  if (dist < cfg.minLiquidationDistancePct) {
-    return hit("liquidation_distance", "reduce", Number(dist.toFixed(2)), cfg.minLiquidationDistancePct,
-      `liquidation distance ${dist.toFixed(1)}% < ${cfg.minLiquidationDistancePct}% — reduce/deleverage`);
-  }
-  return ok("liquidation_distance", Number(dist.toFixed(2)), cfg.minLiquidationDistancePct, "liquidation distance safe");
-}
-
-export function gateConfirmation(ctx: MarketContext): GateResult {
-  // Confirmation only required when a recent news shock is in play.
-  if (ctx.newsShockAgeMin !== undefined && !ctx.confirmationPresent) {
-    return hit("confirmation", "delay", false, true, "post-news confirmation missing — delay until a confirmation candle");
-  }
-  return ok("confirmation", ctx.confirmationPresent, true, "confirmation present or not required");
-}
-
-export function gateNewsFirstSpike(ctx: MarketContext, cfg: TradePermitConfig): GateResult {
-  if (ctx.newsShockAgeMin !== undefined && ctx.newsShockAgeMin < cfg.newsFirstSpikeMinutes) {
-    return hit("news_first_spike", "delay", ctx.newsShockAgeMin, cfg.newsFirstSpikeMinutes,
-      `command ${ctx.newsShockAgeMin}min into a news shock (< ${cfg.newsFirstSpikeMinutes}min) — delay past the first spike`);
-  }
-  return ok("news_first_spike", ctx.newsShockAgeMin ?? "none", cfg.newsFirstSpikeMinutes, "no fresh first-spike");
-}
-
-export function gateMarketSession(ctx: MarketContext): GateResult {
-  // Session is informational and feeds the premium gate; it never blocks alone.
-  return ok("market_session", ctx.marketOpen ? "open" : "closed", "NYSE hours",
-    ctx.marketOpen ? "US market open" : "US market closed — premium gate tightened");
-}
-
-export function gatePremiumDiscount(intent: TradeIntent, ctx: MarketContext, cfg: TradePermitConfig): GateResult {
-  const prem = premiumPct(ctx.price, ctx.underlyingRefPrice);
-  if (prem === undefined) {
-    return ok("premium_discount", "no ref", "n/a", "no underlying reference available");
-  }
-  const abs = Math.abs(prem);
-  const reduceAt = ctx.marketOpen ? cfg.premiumReducePct : cfg.closedSessionPremiumReducePct;
-  if (abs > cfg.premiumDelayPct) {
-    return hit("premium_discount", "delay", Number(prem.toFixed(2)), cfg.premiumDelayPct,
-      `xStock ${prem > 0 ? "premium" : "discount"} ${abs.toFixed(2)}% > ${cfg.premiumDelayPct}% — delay until it converges`);
-  }
-  if (abs > reduceAt) {
-    return hit("premium_discount", "reduce", Number(prem.toFixed(2)), reduceAt,
-      `xStock ${prem > 0 ? "premium" : "discount"} ${abs.toFixed(2)}% > ${reduceAt}%${ctx.marketOpen ? "" : " (overnight, no NYSE anchor)"} — reduce`);
-  }
-  return ok("premium_discount", Number(prem.toFixed(2)), reduceAt, "premium/discount within band");
-}
-
-export function gateBtcCorrelation(intent: TradeIntent, ctx: MarketContext): GateResult {
-  if (isIncrease(intent.direction) && ctx.btcCorrelated && ctx.btcRealizedVolRising) {
-    return hit("btc_correlation", "hedge", "correlated + BTC vol rising", "hedge required",
-      "BTC-correlated asset with BTC realized vol rising — hedge required");
-  }
-  return ok("btc_correlation", ctx.btcCorrelated ? "correlated" : "uncorrelated", "hedge if BTC vol rising", "no hedge trigger");
-}
-
-/** Run all ten gates in declared order. */
-export function runTradeGates(intent: TradeIntent, ctx: MarketContext, cfg: TradePermitConfig): GateResult[] {
-  return [
-    gateDataStaleness(ctx, cfg),
-    gateKnownAsset(ctx),
-    gateEarningsWindow(intent, ctx, cfg),
-    gateVolatilityRegime(ctx, cfg),
-    gateSpreadSlippage(ctx, cfg),
-    gateLiquidationDistance(intent, cfg),
-    gateConfirmation(ctx),
-    gateNewsFirstSpike(ctx, cfg),
-    gateMarketSession(ctx),
-    gatePremiumDiscount(intent, ctx, cfg),
-    gateBtcCorrelation(intent, ctx),
-  ];
-}
+// Re-export the gate registry surface (types, config, helpers, all gates,
+// runTradeGates) so the package's public API is unchanged by the gate split.
+export * from "./gates/index.js";
 
 export interface ApprovedOrder {
   asset: string;
