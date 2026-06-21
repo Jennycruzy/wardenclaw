@@ -535,15 +535,28 @@ async function main(): Promise<void> {
   let mcpClient: BitgetMcpClient | undefined;
   let md: MarketDataSource;
   if (useMcp) {
-    mcpClient = new BitgetMcpClient({
+    const client = new BitgetMcpClient({
       modules: "spot,futures",
       readOnly: true,
-      apiKey: process.env.BITGET_API_KEY,
-      secretKey: process.env.BITGET_API_SECRET,
-      passphrase: process.env.BITGET_API_PASSPHRASE,
     });
-    await mcpClient.start();
-    md = new BitgetMcpMarketData(mcpClient);
+    try {
+      await client.start();
+      mcpClient = client;
+      md = new BitgetMcpMarketData(client);
+    } catch (err) {
+      pushEvent(
+        yellow(
+          `Agent Hub MCP unavailable (${(err as Error).message.slice(0, 100)}); using live Bitget public REST`,
+        ),
+      );
+      try {
+        await client.stop();
+      } catch {
+        // best-effort cleanup of the failed child process
+      }
+      mcpClient = undefined;
+      md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
+    }
   } else {
     md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
   }
@@ -593,12 +606,14 @@ async function main(): Promise<void> {
   let scanner: CachedNewsScanner | null = null;
   if (process.env.BITGET_NEWS_FEED !== "false") {
     const llm = createLlmProvider(process.env, process.env.NEWS_SENTIMENT_MODEL || undefined);
+    const deterministicFallback = process.env.BITGET_NEWS_DETERMINISTIC_FALLBACK !== "false";
     scanner = new CachedNewsScanner(new YahooFinanceNewsFeed(), llm, {
       ttlSeconds: Number(process.env.BITGET_NEWS_TTL_SECONDS ?? "300"),
+      deterministicFallback,
     });
     newsStatus = `news: yahoo finance RSS (real headlines) · classifier: ${
-      scanner.classifierEnabled ? llm.name : "disabled — events absent, gates stay deterministic"
-    }`;
+      scanner.classifierEnabled ? llm.name : "LLM disabled"
+    }${deterministicFallback ? " · deterministic lexicon fallback ON" : " · events absent"}`;
   }
 
   pushEvent(

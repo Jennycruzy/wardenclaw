@@ -15,6 +15,12 @@ import {
   type MandateReplay,
   type SignalMandate,
 } from "@wardenclaw/core";
+import {
+  computePerformance,
+  type OpenMark,
+  type PaperPerformance,
+  type RoundTrip,
+} from "@wardenclaw/bitget-adapter";
 
 /** Walk up from cwd to find the monorepo root (where pnpm-workspace.yaml lives). */
 function findRepoRoot(): string {
@@ -53,6 +59,106 @@ export function loadBitgetLive(): Record<string, unknown> | null {
   } catch {
     return null; // torn read between writes; the client polls again shortly
   }
+}
+
+export interface LivePaperRecords {
+  updatedAt: string;
+  navUsd: number;
+  cashUsd: number;
+  realizedPnlUsd: number;
+  unrealizedPnlUsd: number;
+  openPositions: OpenMark[];
+  roundTrips: RoundTrip[];
+  performance: PaperPerformance | null;
+}
+
+/**
+ * Build the Records view from the running console's actual paper book snapshot.
+ * Missing or malformed runtime state yields null; the UI must show an empty
+ * state rather than substitute fixture trades.
+ */
+export function loadLivePaperRecords(): LivePaperRecords | null {
+  const raw = loadBitgetLive();
+  if (!raw || typeof raw.updatedAt !== "string" || !raw.book || typeof raw.book !== "object") {
+    return null;
+  }
+  const book = raw.book as Record<string, unknown>;
+  if (
+    typeof book.equityUsd !== "number" ||
+    typeof book.cashUsd !== "number" ||
+    !Array.isArray(book.positions) ||
+    !Array.isArray(book.closedTrades)
+  ) {
+    return null;
+  }
+
+  const openPositions: OpenMark[] = book.positions.flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const p = value as Record<string, unknown>;
+    if (
+      typeof p.asset !== "string" ||
+      typeof p.entryPrice !== "number" ||
+      typeof p.markPrice !== "number" ||
+      typeof p.quantity !== "number" ||
+      typeof p.notionalUsd !== "number" ||
+      typeof p.openedAt !== "string"
+    ) {
+      return [];
+    }
+    const markValue = p.quantity * p.markPrice;
+    const unrealizedUsd = markValue - p.notionalUsd;
+    return [{
+      asset: p.asset,
+      entryPrice: p.entryPrice,
+      markPrice: p.markPrice,
+      quantity: p.quantity,
+      notionalUsd: p.notionalUsd,
+      unrealizedUsd,
+      unrealizedPct: p.notionalUsd > 0 ? (unrealizedUsd / p.notionalUsd) * 100 : 0,
+      openedAt: p.openedAt,
+    }];
+  });
+
+  const roundTrips: RoundTrip[] = book.closedTrades.flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const t = value as Record<string, unknown>;
+    if (
+      typeof t.asset !== "string" ||
+      typeof t.entryPrice !== "number" ||
+      typeof t.exitPrice !== "number" ||
+      typeof t.notionalUsd !== "number" ||
+      typeof t.pnlUsd !== "number" ||
+      typeof t.pnlPct !== "number" ||
+      typeof t.openedAt !== "string" ||
+      typeof t.closedAt !== "string" ||
+      !["stop", "signal_exit", "watchdog", "manual"].includes(String(t.reason))
+    ) {
+      return [];
+    }
+    return [{
+      source: "paper",
+      asset: t.asset,
+      entryPrice: t.entryPrice,
+      exitPrice: t.exitPrice,
+      notionalUsd: t.notionalUsd,
+      pnlUsd: t.pnlUsd,
+      pnlPct: t.pnlPct,
+      openedAt: t.openedAt,
+      closedAt: t.closedAt,
+      reason: t.reason as RoundTrip["reason"],
+    }];
+  });
+
+  return {
+    updatedAt: raw.updatedAt,
+    navUsd: book.equityUsd,
+    cashUsd: book.cashUsd,
+    realizedPnlUsd: roundTrips.reduce((sum, t) => sum + t.pnlUsd, 0),
+    unrealizedPnlUsd: openPositions.reduce((sum, p) => sum + p.unrealizedUsd, 0),
+    openPositions,
+    roundTrips,
+    performance: computePerformance(roundTrips),
+  };
 }
 
 export function queueBitgetCommand(line: string): { id: number } | { error: string } {

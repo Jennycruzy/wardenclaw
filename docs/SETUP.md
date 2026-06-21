@@ -33,7 +33,7 @@ pnpm verify:bitget-hub              # prove the Bitget Agent Hub MCP integration
 ## Run the reactor (paper, real market data)
 
 ```bash
-pnpm backtest:bitget                # report → data/backtests/ (shown on the dashboard)
+pnpm backtest:bitget -- NVDAXUSDT  # real candles only; report → data/backtests/
 pnpm calibrate:reactor              # calibrate shock thresholds against real history
 pnpm run:bitget-paper               # paper-trade real Bitget public data
 pnpm console:bitget                 # interactive live console

@@ -15,22 +15,23 @@ export default function BacktestPage() {
       <Shell title="Backtest" subtitle="Same shock/cooldown and net-edge logic the live paper agent uses.">
         <EmptyState
           title="No backtest reports yet"
-          hint="Run a backtest over a real Bitget symbol, or use the synthetic shock-and-run series. Reports are written to data/backtests/."
+          hint="Run a backtest over a real Bitget symbol. Retrieval failures stop the run; no synthetic fallback is used."
           command="pnpm backtest:bitget -- NVDAXUSDT"
         />
       </Shell>
     );
   }
 
-  const synthetic = report.source.startsWith("synthetic");
+  const generatedAgeMs = Date.now() - Date.parse(report.generatedAt);
+  const stale = !Number.isFinite(generatedAgeMs) || generatedAgeMs > 24 * 60 * 60 * 1000;
 
   return (
     <Shell
       title="Backtest"
       subtitle={`Source: ${report.source} · ${num(report.bars)} bars · ${shortTime(report.generatedAt)}`}
       actions={
-        <Badge tone={synthetic ? "warn" : "pos"}>
-          {synthetic ? "Synthetic series (labeled)" : "Real Bitget candles"}
+        <Badge tone={stale ? "warn" : "pos"}>
+          {stale ? "Real candles · stale report" : "Real Bitget candles · fresh"}
         </Badge>
       }
     >

@@ -5,8 +5,8 @@
  *
  *   pnpm backtest:bitget -- NVDAXUSDT
  *
- * Falls back to a documented synthetic shock-and-run series when no symbol is
- * given or live data is unavailable — clearly labeled as synthetic in the report.
+ * Requires real Bitget candles. Data errors fail the run rather than silently
+ * replacing the requested market with a synthetic series.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -17,45 +17,16 @@ import {
   type BitgetCandle,
 } from "@wardenclaw/bitget-adapter";
 
-function syntheticSeries(): BitgetCandle[] {
-  const bars: BitgetCandle[] = [];
-  let price = 100;
-  for (let i = 0; i < 60; i++) {
-    // Inject a shock at bar 20, then a sustained run-up.
-    const isShock = i === 20;
-    const drift = i > 20 ? 0.012 : 0.0;
-    price = isShock ? price * 1.06 : price * (1 + drift);
-    bars.push({
-      time: new Date(Date.UTC(2026, 5, 1, 0, i)).toISOString(),
-      open: price * 0.999,
-      high: price * 1.004,
-      low: price * 0.996,
-      close: price,
-      volume: isShock ? 3000 : 1000,
-    });
-  }
-  return bars;
-}
-
 async function main(): Promise<void> {
-  const symbol = process.argv[2];
-  let candles: BitgetCandle[];
-  let source: string;
-
-  if (symbol) {
-    try {
-      const md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
-      candles = await md.getCandles(symbol, process.env.BITGET_CANDLE_GRANULARITY ?? "5min", 200);
-      source = `bitget_public:${symbol}`;
-    } catch (err) {
-      console.warn(`[backtest] live data unavailable (${(err as Error).message}); using synthetic series`);
-      candles = syntheticSeries();
-      source = "synthetic_shock_and_run";
-    }
-  } else {
-    candles = syntheticSeries();
-    source = "synthetic_shock_and_run";
-  }
+  const symbol = process.argv[2] ?? "NVDAXUSDT";
+  const md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
+  const candles: BitgetCandle[] = await md.getCandles(
+    symbol,
+    process.env.BITGET_CANDLE_GRANULARITY ?? "5min",
+    200,
+  );
+  if (candles.length < 2) throw new Error(`Bitget returned insufficient candles for ${symbol}`);
+  const source = `bitget_public:${symbol}`;
 
   const result = backtestReactor(candles);
   const report = {

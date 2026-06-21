@@ -47,7 +47,7 @@ export default function BitgetOverview() {
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Signal Mandates" value={num(stats.total)} sub={`updated ${timeAgo(stats.lastUpdated)}`} />
-        <Stat label="Paper entries" value={num(stats.filled)} valueClass="text-pos" sub="filled this run" />
+        <Stat label="Paper entries" value={num(stats.filled)} valueClass="text-pos" sub="filled across recorded runs" />
         <Stat label="Disciplined skips" value={num(stats.rejected)} valueClass="text-neg" sub="gated rejections" />
         <Stat label="Watching" value={num(stats.watching)} sub="armed / cooldown" />
       </div>

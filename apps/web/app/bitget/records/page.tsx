@@ -1,25 +1,11 @@
 import { Shell } from "@/components/shell";
 import { Card, SectionTitle, Stat, Badge, EmptyState } from "@/components/ui";
 import { AssetTag } from "@/components/asset-logo";
-import { PriceLine } from "@/components/charts";
-import { loadScorecard, loadFixtureCandles } from "@/lib/data";
-import { num } from "@/lib/format";
+import { loadScorecard, loadFixtureCandles, loadLivePaperRecords } from "@/lib/data";
+import { num, timeAgo } from "@/lib/format";
 import { ghostCompare, type SimCandle } from "@wardenclaw/core";
-import { PaperBook, buildPaperRecords } from "@wardenclaw/bitget-adapter";
 
 export const dynamic = "force-dynamic";
-
-/** NVDAx price window + the demo execution markers (buy @10, sell @40). */
-function priceWindow() {
-  const candles = loadFixtureCandles("NVDAx").slice(0, 60);
-  return {
-    data: candles.map((c) => ({ close: c.close })),
-    markers: [
-      { index: 10, side: "buy" as const, label: "open" },
-      { index: 40, side: "sell" as const, label: "close" },
-    ],
-  };
-}
 
 function ghostFromFixtures() {
   const candles = loadFixtureCandles("NVDAx").slice(40, 88) as SimCandle[];
@@ -32,28 +18,11 @@ function ghostFromFixtures() {
   );
 }
 
-/** A small paper book over real fixture prices to populate the records views. */
-function demoRecords() {
-  const nvda = loadFixtureCandles("NVDAx");
-  const mstr = loadFixtureCandles("MSTRx");
-  const book = new PaperBook(1000);
-  if (nvda.length > 60) {
-    book.open({ asset: "NVDAx", refPrice: nvda[10]!.close, notionalUsd: 150, stopPrice: nvda[10]!.close * 0.95, slippageBps: 8, timestamp: nvda[10]!.time });
-    book.close({ asset: "NVDAx", refPrice: nvda[40]!.close, slippageBps: 8, timestamp: nvda[40]!.time, reason: "signal_exit" });
-    book.open({ asset: "MSTRx", refPrice: mstr[20]!.close, notionalUsd: 120, stopPrice: mstr[20]!.close * 0.95, slippageBps: 12, timestamp: mstr[20]!.time });
-  }
-  const prices: Record<string, number> = {
-    MSTRx: mstr.length ? mstr[mstr.length - 1]!.close : 100,
-  };
-  return buildPaperRecords(book, { prices, nowIso: nvda.length ? nvda[nvda.length - 1]!.time : undefined });
-}
-
 export default function RecordsPage() {
   const sc = loadScorecard();
   const ghost = ghostFromFixtures();
-  const rec = demoRecords();
-  const pw = priceWindow();
-  const perf = rec.performance;
+  const rec = loadLivePaperRecords();
+  const perf = rec?.performance;
   const sd = sc?.summary as
     | { verdictDistribution?: Record<string, number>; aggregateMaxDrawdownUsd?: { without: number; with: number }; liquidations?: { avoided: number }; aggregatePnlUsd?: { without: number; with: number } }
     | undefined;
@@ -63,24 +32,34 @@ export default function RecordsPage() {
       <div className="flex flex-col gap-6">
         {/* Paper records */}
         <Card>
-          <SectionTitle title="Paper records" subtitle="Native NAV marks and round trips — paper / sim only." right={<Badge tone="neutral">PAPER</Badge>} />
-          <div className="grid gap-3 sm:grid-cols-4">
-            <Stat label="NAV (USD)" value={num(rec.navUsd)} />
-            <Stat label="Realized PnL" value={num(rec.realizedPnlUsd)} valueClass={rec.realizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
-            <Stat label="Unrealized PnL" value={num(rec.unrealizedPnlUsd)} valueClass={rec.unrealizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
-            <Stat label="Open positions" value={rec.openPositions.length} />
-          </div>
-          {perf ? (
-            <div className="mt-3 grid gap-3 sm:grid-cols-4">
-              <Stat label="Win rate" value={`${perf.winRatePct}%`} sub={`${perf.wins}/${perf.closedTrades} wins`} />
-              <Stat label="Profit factor" value={perf.profitFactor === Infinity ? "∞" : num(perf.profitFactor)} />
-              <Stat label="Avg win" value={num(perf.avgWinUsd)} />
-              <Stat label="Avg loss" value={num(perf.avgLossUsd)} />
-            </div>
+          <SectionTitle
+            title="Paper records"
+            subtitle={rec ? `Actual running console book · updated ${timeAgo(rec.updatedAt)}` : "Actual running console book — no fixture fallback."}
+            right={<Badge tone="neutral">PAPER</Badge>}
+          />
+          {rec ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <Stat label="NAV (USD)" value={num(rec.navUsd)} />
+                <Stat label="Realized PnL" value={num(rec.realizedPnlUsd)} valueClass={rec.realizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
+                <Stat label="Unrealized PnL" value={num(rec.unrealizedPnlUsd)} valueClass={rec.unrealizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
+                <Stat label="Open positions" value={rec.openPositions.length} />
+              </div>
+              {perf ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                  <Stat label="Win rate" value={`${perf.winRatePct}%`} sub={`${perf.wins}/${perf.closedTrades} wins`} />
+                  <Stat label="Profit factor" value={perf.profitFactor === Infinity ? "∞" : num(perf.profitFactor)} />
+                  <Stat label="Avg win" value={num(perf.avgWinUsd)} />
+                  <Stat label="Avg loss" value={num(perf.avgLossUsd)} />
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-ink-muted">No closed round trips in the current live paper book.</p>
+              )}
+            </>
           ) : (
-            <p className="mt-3 text-xs text-ink-muted">Win-rate &amp; profit-factor appear after the first closed round trip.</p>
+            <EmptyState title="No live paper book" hint="Start the console and complete a scan. Records will remain empty rather than showing fixture trades." command="pnpm console:bitget" />
           )}
-          {rec.roundTrips.length > 0 && (
+          {rec && rec.roundTrips.length > 0 && (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="text-ink-faint">
@@ -89,7 +68,7 @@ export default function RecordsPage() {
                 <tbody className="tabular">
                   {rec.roundTrips.map((t, i) => (
                     <tr key={i} className="border-t border-line">
-                      <td className="py-1"><Badge tone={t.source === "paper" ? "accent" : "neutral"}>{t.source}</Badge></td>
+                      <td className="py-1"><Badge tone="accent">{t.source}</Badge></td>
                       <td><AssetTag symbol={t.asset} size={18} /></td><td>{num(t.entryPrice)}</td><td>{num(t.exitPrice)}</td>
                       <td className={t.pnlUsd >= 0 ? "text-pos" : "text-neg"}>{num(t.pnlUsd)}</td>
                       <td className={t.pnlPct >= 0 ? "text-pos" : "text-neg"}>{num(t.pnlPct)}%</td>
@@ -99,16 +78,6 @@ export default function RecordsPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </Card>
-
-        {/* Symbol price + execution markers */}
-        <Card>
-          <SectionTitle title="Symbol price & execution markers" subtitle="NVDAx — real candles with paper open/close markers aligned to the window." right={<AssetTag symbol="NVDAx" size={20} />} />
-          {pw.data.length > 1 ? (
-            <PriceLine data={pw.data} markers={pw.markers} />
-          ) : (
-            <EmptyState title="No candle fixtures" hint="Run pnpm run:scorecard to cache candles." />
           )}
         </Card>
 
