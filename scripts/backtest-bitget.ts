@@ -18,7 +18,7 @@ import {
 } from "@wardenclaw/bitget-adapter";
 
 async function main(): Promise<void> {
-  const symbol = process.argv[2] ?? "NVDAXUSDT";
+  const symbol = process.argv.slice(2).find((arg) => arg !== "--") ?? "NVDAXUSDT";
   const md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
   const candles: BitgetCandle[] = await md.getCandles(
     symbol,
