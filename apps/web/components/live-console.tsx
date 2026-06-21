@@ -56,6 +56,11 @@ interface LiveState {
     }>;
     closedTrades: Array<{ asset: string; pnlUsd: number; reason: string; exitPrice: number }>;
   };
+  recordSummary?: {
+    auditedClosedTrades: number;
+    unresolvedEntries: number;
+    realizedPnlUsd: number;
+  };
   events?: Array<{ time: string; text: string }>;
 }
 
@@ -178,15 +183,22 @@ export function LiveConsole() {
       {online && state?.book ? (
         <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-sm">
           <span>
-            equity <span className="tabular font-semibold">${usd(state.book.equityUsd)}</span>
+            current book equity <span className="tabular font-semibold">${usd(state.book.equityUsd)}</span>
           </span>
           <span className="text-ink-muted">
             cash <span className="tabular">${usd(state.book.cashUsd)}</span>
           </span>
           <span className="text-ink-muted">
-            open <span className="tabular">{state.book.positions.length}</span> · closed{" "}
+            current open <span className="tabular">{state.book.positions.length}</span> · current closed{" "}
             <span className="tabular">{state.book.closedTrades.length}</span>
           </span>
+          {state.recordSummary ? (
+            <span className="text-ink-muted">
+              audited history: closed <span className="tabular">{state.recordSummary.auditedClosedTrades}</span>
+              {" · "}unresolved entries <span className="tabular">{state.recordSummary.unresolvedEntries}</span>
+              {" · "}realized <span className="tabular">${usd(state.recordSummary.realizedPnlUsd)}</span>
+            </span>
+          ) : null}
           {typeof state.indexSupport === "number" ? (
             <span className="text-ink-muted">
               index support <span className="tabular">{state.indexSupport.toFixed(2)}</span>

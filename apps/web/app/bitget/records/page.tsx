@@ -34,16 +34,21 @@ export default function RecordsPage() {
         <Card>
           <SectionTitle
             title="Paper records"
-            subtitle={rec ? `Actual running console book · updated ${timeAgo(rec.updatedAt)}` : "Actual running console book — no fixture fallback."}
+            subtitle={rec ? `Current live book plus exact hash-chained settlement records · updated ${timeAgo(rec.updatedAt)}` : "Actual running console book — no fixture fallback."}
             right={<Badge tone="neutral">PAPER</Badge>}
           />
           {rec ? (
             <>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Stat label="NAV (USD)" value={num(rec.navUsd)} />
-                <Stat label="Realized PnL" value={num(rec.realizedPnlUsd)} valueClass={rec.realizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
+                <Stat label="Current NAV (USD)" value={num(rec.navUsd)} sub="current persisted book" />
+                <Stat label="Audited realized PnL" value={num(rec.realizedPnlUsd)} valueClass={rec.realizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
                 <Stat label="Unrealized PnL" value={num(rec.unrealizedPnlUsd)} valueClass={rec.unrealizedPnlUsd >= 0 ? "text-pos" : "text-neg"} />
                 <Stat label="Open positions" value={rec.openPositions.length} />
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <Stat label="Current closed" value={rec.currentClosedTrades} sub="persisted live book" />
+                <Stat label="Recovered closed" value={rec.recoveredClosedTrades} sub="exact settlement events" />
+                <Stat label="Entry-only records" value={rec.unresolvedEntries} sub="no recorded settlement" />
               </div>
               {perf ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-4">
@@ -53,7 +58,7 @@ export default function RecordsPage() {
                   <Stat label="Avg loss" value={num(perf.avgLossUsd)} />
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-ink-muted">No closed round trips in the current live paper book.</p>
+                <p className="mt-3 text-xs text-ink-muted">No exact closed round trips are recorded.</p>
               )}
             </>
           ) : (
@@ -68,7 +73,7 @@ export default function RecordsPage() {
                 <tbody className="tabular">
                   {rec.roundTrips.map((t, i) => (
                     <tr key={i} className="border-t border-line">
-                      <td className="py-1"><Badge tone="accent">{t.source}</Badge></td>
+                      <td className="py-1"><Badge tone={t.recordOrigin === "audit_settlement" ? "pos" : "accent"}>{t.recordOrigin === "audit_settlement" ? "audit recovered" : "live paper"}</Badge></td>
                       <td><AssetTag symbol={t.asset} size={18} /></td><td>{num(t.entryPrice)}</td><td>{num(t.exitPrice)}</td>
                       <td className={t.pnlUsd >= 0 ? "text-pos" : "text-neg"}>{num(t.pnlUsd)}</td>
                       <td className={t.pnlPct >= 0 ? "text-pos" : "text-neg"}>{num(t.pnlPct)}%</td>

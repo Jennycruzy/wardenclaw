@@ -68,8 +68,71 @@ export interface LivePaperRecords {
   realizedPnlUsd: number;
   unrealizedPnlUsd: number;
   openPositions: OpenMark[];
-  roundTrips: RoundTrip[];
+  roundTrips: AuditedRoundTrip[];
   performance: PaperPerformance | null;
+  currentClosedTrades: number;
+  recoveredClosedTrades: number;
+  unresolvedEntries: number;
+}
+
+export interface AuditedRoundTrip extends RoundTrip {
+  mandateId?: string;
+  recordOrigin: "live_book" | "audit_settlement";
+}
+
+function recoveredAuditRecords(): {
+  roundTrips: AuditedRoundTrip[];
+  unresolvedEntries: number;
+} {
+  const filled = loadBitgetMandates().filter(
+    (m) => m.execution.status === "filled" && m.execution.paperFill,
+  );
+  const settlements = new Map(
+    loadAllAuditEvents()
+      .filter((event) => event.stage === "settlement")
+      .map((event) => [event.mandateId, event]),
+  );
+  const roundTrips: AuditedRoundTrip[] = [];
+
+  for (const mandate of filled) {
+    const settlement = settlements.get(mandate.id);
+    if (!settlement) continue;
+    const fill = mandate.execution.paperFill as Record<string, unknown>;
+    const output = settlement.output;
+    const input = settlement.input;
+    const reason = String(output.reason);
+    if (
+      typeof fill.notionalUsd !== "number" ||
+      typeof fill.timestamp !== "string" ||
+      typeof output.entryPrice !== "number" ||
+      typeof output.exitPrice !== "number" ||
+      typeof output.pnlUsd !== "number" ||
+      typeof output.pnlPct !== "number" ||
+      typeof input.asset !== "string" ||
+      !["stop", "signal_exit", "watchdog", "manual"].includes(reason)
+    ) {
+      continue;
+    }
+    roundTrips.push({
+      source: "paper",
+      mandateId: mandate.id,
+      recordOrigin: "audit_settlement",
+      asset: input.asset,
+      entryPrice: output.entryPrice,
+      exitPrice: output.exitPrice,
+      notionalUsd: fill.notionalUsd,
+      pnlUsd: output.pnlUsd,
+      pnlPct: output.pnlPct,
+      openedAt: fill.timestamp,
+      closedAt: settlement.timestamp,
+      reason: reason as RoundTrip["reason"],
+    });
+  }
+
+  return {
+    roundTrips,
+    unresolvedEntries: filled.length - roundTrips.length,
+  };
 }
 
 /**
@@ -119,7 +182,7 @@ export function loadLivePaperRecords(): LivePaperRecords | null {
     }];
   });
 
-  const roundTrips: RoundTrip[] = book.closedTrades.flatMap((value) => {
+  const liveRoundTrips: AuditedRoundTrip[] = book.closedTrades.flatMap((value) => {
     if (!value || typeof value !== "object") return [];
     const t = value as Record<string, unknown>;
     if (
@@ -137,6 +200,8 @@ export function loadLivePaperRecords(): LivePaperRecords | null {
     }
     return [{
       source: "paper",
+      ...(typeof t.mandateId === "string" ? { mandateId: t.mandateId } : {}),
+      recordOrigin: "live_book",
       asset: t.asset,
       entryPrice: t.entryPrice,
       exitPrice: t.exitPrice,
@@ -148,6 +213,16 @@ export function loadLivePaperRecords(): LivePaperRecords | null {
       reason: t.reason as RoundTrip["reason"],
     }];
   });
+  const recovered = recoveredAuditRecords();
+  const liveMandateIds = new Set(
+    liveRoundTrips.flatMap((trip) => (trip.mandateId ? [trip.mandateId] : [])),
+  );
+  const recoveredOnly = recovered.roundTrips.filter(
+    (trip) => !trip.mandateId || !liveMandateIds.has(trip.mandateId),
+  );
+  const roundTrips = [...liveRoundTrips, ...recoveredOnly].sort(
+    (a, b) => Date.parse(b.closedAt) - Date.parse(a.closedAt),
+  );
 
   return {
     updatedAt: raw.updatedAt,
@@ -158,6 +233,22 @@ export function loadLivePaperRecords(): LivePaperRecords | null {
     openPositions,
     roundTrips,
     performance: computePerformance(roundTrips),
+    currentClosedTrades: liveRoundTrips.length,
+    recoveredClosedTrades: recoveredOnly.length,
+    unresolvedEntries: recovered.unresolvedEntries,
+  };
+}
+
+export function loadPaperRecordSummary(): {
+  auditedClosedTrades: number;
+  unresolvedEntries: number;
+  realizedPnlUsd: number;
+} {
+  const recovered = recoveredAuditRecords();
+  return {
+    auditedClosedTrades: recovered.roundTrips.length,
+    unresolvedEntries: recovered.unresolvedEntries,
+    realizedPnlUsd: recovered.roundTrips.reduce((sum, trip) => sum + trip.pnlUsd, 0),
   };
 }
 

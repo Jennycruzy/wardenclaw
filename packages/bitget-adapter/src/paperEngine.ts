@@ -35,6 +35,7 @@ export interface PaperPosition {
 }
 
 export interface PaperTrade {
+  mandateId?: string;
   asset: string;
   entryPrice: number;
   exitPrice: number;
@@ -175,6 +176,7 @@ export class PaperBook {
 
     const pnlUsd = proceeds - pos.notionalUsd;
     const trade: PaperTrade = {
+      ...(pos.mandateId ? { mandateId: pos.mandateId } : {}),
       asset: args.asset,
       entryPrice: pos.entryPrice,
       exitPrice: fillPrice,

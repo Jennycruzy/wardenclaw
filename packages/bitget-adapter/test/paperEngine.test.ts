@@ -80,6 +80,27 @@ describe("PaperBook", () => {
     expect(restored.equity({ NVDAx: 105 })).toBe(first.equity({ NVDAx: 105 }));
   });
 
+  it("carries the opening mandate id into the closed trade", () => {
+    const book = new PaperBook(1_000);
+    book.open({
+      asset: "TSLAx",
+      refPrice: 100,
+      notionalUsd: 100,
+      stopPrice: 95,
+      slippageBps: 0,
+      timestamp: "2026-06-21T00:00:00.000Z",
+      mandateId: "mandate-1",
+    });
+    const trade = book.close({
+      asset: "TSLAx",
+      refPrice: 101,
+      slippageBps: 0,
+      timestamp: "2026-06-21T01:00:00.000Z",
+      reason: "signal_exit",
+    });
+    expect(trade.mandateId).toBe("mandate-1");
+  });
+
   it("rejects opening beyond available cash", () => {
     const book = new PaperBook(100);
     expect(() =>
