@@ -325,15 +325,9 @@ export function listBacktests(): BacktestReport[] {
   return reports;
 }
 
-/**
- * Headline report for the backtest page: the most recent report that actually
- * traded. A calibrated selective threshold legitimately produces 0-trade
- * reports for quiet symbols; showing one as the headline reads as "empty" when
- * the discipline is the story. Falls back to the most recent report overall.
- */
+/** Headline report for the backtest page: strictly the newest generated report. */
 export function getLatestBacktest(): BacktestReport | null {
-  const all = listBacktests();
-  return all.find((r) => r.summary.numTrades > 0) ?? all[0] ?? null;
+  return listBacktests()[0] ?? null;
 }
 
 // ---- Environment / mode readouts -----------------------------------------
