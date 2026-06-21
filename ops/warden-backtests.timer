@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh WARDENCLAW xStock backtests hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+RandomizedDelaySec=2min
+Unit=warden-backtests.service
+
+[Install]
+WantedBy=timers.target
+

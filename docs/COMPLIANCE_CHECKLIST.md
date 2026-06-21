@@ -9,7 +9,7 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 |---|---|---|
 | Paper / simulation only, no real-capital path | ✅ | every fill labeled `paper`; `wardenExecutor.ts`, `demoExecutor.ts` (demo trading only) |
 | Deterministic verdicts (LLM parses/classifies only) | ✅ | `playbookShield.ts`, `tradePermit.ts` — no LLM in the verdict path |
-| Fail-closed | ✅ | stale/unknown-asset/tamper/expiry/replay → refuse; `tradePermit.ts`, `wardenPermit.ts` |
+| Fail-closed | 🟡 | permit/executor modules fail closed, but the live reactor still opens/closes `PaperBook` directly instead of passing every fill through `WardenExecutor` |
 | No narrated numbers | ✅ | `ghostSim.ts`, `run-scorecard.ts` compute from real candles |
 | Bitget-native tools and data | ✅ | Agent Hub, MCP client, public market data; fixtures cached |
 | 6 trade verdicts / 3 strategy verdicts / 5 assets | ✅ | `TradeVerdict`, `StrategyVerdict`, `TRADEABLE_XSTOCKS` |
@@ -31,37 +31,40 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 | 2 | Six canonical acceptance fixtures | ✅ | `test/tradePermit.test.ts` |
 | 2 | Fail-closed branches, one test each | ✅ | `test/tradePermit.test.ts` |
 | 3 | Permit signature (HMAC), expiry, single-use, market-state binding, chain, canonical serialization | ✅ | `wardenPermit.ts`, `wardenCard.ts`, `test/wardenPermit.test.ts` |
-| 4 | Sim executor gateway (independent verify) | ✅ | `wardenExecutor.ts` |
+| 4 | Sim executor gateway (independent verify) | 🟡 | `wardenExecutor.ts` and bypass tests are complete; live reactor integration is still missing |
 | 4 | Atomic two-leg HEDGE bundle | ✅ | `wardenExecutor.ts`, `test/wardenExecutor.test.ts` |
 | 4 | `demo_bypass` | ✅ | `scripts/demo-bypass.ts` (`pnpm demo:bypass`) |
 | 5 | Ghost simulation (computed) | ✅ | `ghostSim.ts`, `test/ghostSim.test.ts` |
-| 5 | Aggregate scorecard from real candles | ✅ | `scripts/run-scorecard.ts`, `fixtures/market/` |
-| 6 | Close-only watcher (background, state cards) | ✅ | `closeOnlyWatcher.ts`, `scripts/demo-closeonly.ts` |
+| 5 | Aggregate scorecard from real candles | 🟡 | deterministic real-candle scenario scorecard exists, but “max drawdown” is currently a sum of scenario drawdowns rather than one portfolio equity-curve max drawdown; HEDGE scorecard PnL omits the protective leg |
+| 6 | Close-only watcher (background, state cards) | 🟡 | controller + signed cards + demo exist; it is not yet polled by the live console/paper-agent loop |
 | 7 | WardenClaw MCP server (7 tools) | ✅ | `mcpServer.ts`, `scripts/warden-mcp-server.ts` |
 | 7 | MCP end-to-end round-trip test | ✅ | `test/mcpServer.test.ts` |
 | 8 | Structured logger (stdout + JSONL) | ✅ | `evidenceLog.ts` |
 | 8 | `evidence:run` transcript | ✅ | `scripts/evidence-run.ts` |
-| 8.b | Studio-parity paper records (NAV marks, round-trips, early win-rate/profit-factor) | ✅ | `paperRecords.ts` (`buildPaperRecords`, `computePerformance`) + the `/bitget/records` page; win-rate/profit-factor surface from the first closed trip |
-| 9 | UI: verdict badges, Playbook panel, original-vs-adjusted comparison, verification panel, fail-closed banner | ✅ | `apps/web/app/bitget/firewall/page.tsx`, `components/firewall.tsx` (server-rendered from the real engine) |
+| 8.b | Studio-parity paper records (NAV marks, round-trips, early win-rate/profit-factor) | 🟡 | current book persists and one exact historical settlement is recovered; three pre-persistence entries remain unresolved because no exit event exists |
+| 9 | UI: verdict badges, Playbook panel, original-vs-adjusted comparison, verification panel, fail-closed banner | 🟡 | engine-rendered examples exist, but the required editable strategy input and “Run in Mandate Mode” action are not implemented |
 | 9 | UI extras: ghost-sim panel, scorecard summary view | ✅ | `/bitget/records` page (computed from real fixture candles + `output/scorecard.json`) |
-| 9 | UI extras: separated backtest/live-NAV/price charts with execution markers | ✅ | price chart + execution markers (commit `43b8a81`) |
+| 9 | UI extras: separated backtest/live-NAV/price charts with execution markers | ❌ | backtest equity curve exists; current live-NAV and real execution-marker charts are not implemented |
 | 9 | UI extras: Bitget asset logos | ⚠️ documented deviation | Bitget coins API exposes no logo URL and the image catalog is hotlink-protected (403, hashed filenames) — verified 2026-06-20; branded monogram retained with a `src` hook (`apps/web/components/asset-logo.tsx`). See `ARCHITECTURE_AUDIT.md §8.5` |
 | Perception | Live Bitget perception wired into the gate inputs | ✅ | `marketContext.ts`, `scripts/verify-perception.ts`; live `perception source: live_bitget_agent_hub_mcp` on the VPS |
 | Hardening | Transient 429 retry (REST + MCP), deterministic news fallback | ✅ | `retry.ts`, `mcpMarketData.ts`, `newsFeed.classifyNewsDeterministic`; see `ARCHITECTURE_AUDIT.md §8` |
-| 10 | Full test suite | ✅ | 281 tests (174 core + 107 adapter) |
+| Ops | Automated real-candle backtest refresh | ✅ | `scripts/refresh-bitget-backtests.ts`, `ops/warden-backtests.{service,timer}` |
+| 10 | Full test suite | ✅ | full core + adapter suites pass; exact count should be generated rather than maintained manually |
 | 10 | Docs (README, GATE_TABLE, PLAYBOOK_SHIELD) | ✅ | `README.md`, `docs/GATE_TABLE.md`, `docs/PLAYBOOK_SHIELD.md` |
 | 10 | Demo kit + submission blurb + this checklist | ✅ | `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_BLURB.md`, this file |
 
 ## Outstanding work (honest)
 
-One **documented deviation** remains: **Bitget asset logos**. Bitget's public coins
-API returns no logo URL and the image catalog is hotlink-protected (403, hashed
-filenames), so there is no reliable symbol→URL mapping to embed; we ship a branded
-monogram with a `src` hook for a future catalog URL (see `ARCHITECTURE_AUDIT.md §8.5`).
-Everything else in the spec is implemented.
+The isolated firewall modules, tests, demos, MCP tools, signed cards, and live
+perception are working. The remaining prompt-level gaps are material:
 
-The two checkpoints, signed permits, the executor + atomic hedge, the close-only
-watcher, ghost-sim + scorecard, the MCP server, native evidence + studio-parity paper
-records, live Bitget perception wiring (live Agent Hub MCP source, with 429-retry
-hardening and a deterministic news-classifier fallback), and the firewall + records UI
-are complete, tested (281 tests), and verified running on the deployment VPS.
+1. Route live reactor entry/exit execution through signed permits and
+   `WardenExecutor`; direct `PaperBook.open/close` calls do not satisfy the
+   command-firewall invariant.
+2. Integrate `CloseOnlyController` into the continuous live position loop and
+   enforce its state at permit issuance and execution.
+3. Rework the scorecard to calculate portfolio equity-curve maximum drawdown,
+   include both HEDGE legs, and anchor event scenarios to recorded real events.
+4. Build the interactive Playbook Shield input/action and the missing live-NAV
+   and real execution-marker charts.
+5. Bitget asset logos remain a documented external-catalog deviation.

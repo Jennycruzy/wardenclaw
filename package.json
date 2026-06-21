@@ -16,6 +16,7 @@
     "run:bitget-paper": "tsx scripts/run-bitget-paper.ts",
     "console:bitget": "tsx scripts/console-bitget.ts",
     "backtest:bitget": "tsx scripts/backtest-bitget.ts",
+    "backtest:all": "tsx scripts/refresh-bitget-backtests.ts",
     "replay": "tsx scripts/replay-mandate.ts",
     "verify:integrations": "tsx scripts/verify-integrations.ts",
     "verify:llm": "tsx scripts/verify-llm.ts",

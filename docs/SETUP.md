@@ -34,6 +34,7 @@ pnpm verify:bitget-hub              # prove the Bitget Agent Hub MCP integration
 
 ```bash
 pnpm backtest:bitget -- NVDAx      # resolves to verified NVDAONUSDT; real candles only
+pnpm backtest:all                  # refresh all five verified assets
 pnpm calibrate:reactor              # calibrate shock thresholds against real history
 pnpm run:bitget-paper               # paper-trade real Bitget public data
 pnpm console:bitget                 # interactive live console
@@ -42,6 +43,18 @@ pnpm --filter @wardenclaw/web dev   # dashboard → http://localhost:3000/bitget
 
 Execution is always labeled (`internal_paper_engine`); fills are simulated on real prices, never
 presented as exchange fills.
+
+## Automated backtest refresh on the VPS
+
+```bash
+cp ops/warden-backtests.service ops/warden-backtests.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now warden-backtests.timer
+systemctl list-timers warden-backtests.timer
+```
+
+The timer runs hourly and writes new reports under `data/backtests/`. It uses only
+real Bitget candles and exits non-zero on retrieval failures.
 
 ## LLM (optional)
 

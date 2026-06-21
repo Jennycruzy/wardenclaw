@@ -65,8 +65,13 @@ pnpm evidence:run       # full end-to-end native evidence transcript
 pnpm run:bitget-paper
 pnpm console:bitget
 pnpm backtest:bitget -- NVDAx
+pnpm backtest:all                         # refresh all five verified assets
 pnpm --filter @wardenclaw/web dev            # dashboard on http://localhost:3000
 ```
+
+Production installs `ops/warden-backtests.{service,timer}` to refresh all five
+real-candle backtests hourly. The timer fails loudly if Bitget data is unavailable;
+it never substitutes synthetic candles.
 
 ## Bitget toolchain + MCP servers
 

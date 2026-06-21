@@ -90,9 +90,9 @@ BITGET_CYCLES=10 BITGET_POLL_SECONDS=60 pnpm run:bitget-paper
 # and classified by the configured LLM into the reactor's sentiment gate.
 pnpm console:bitget
 
-# Backtest the reactor (real symbol, or synthetic fallback if unavailable)
-pnpm backtest:bitget -- NVDAONUSDT
-pnpm backtest:bitget            # synthetic shock-and-run series
+# Backtest the reactor from real Bitget candles only
+pnpm backtest:bitget -- NVDAx
+pnpm backtest:all               # all five verified xStocks
 
 # Prove the Agent Hub MCP integration end-to-end
 pnpm verify:bitget-hub
@@ -142,7 +142,8 @@ Recharts), fully responsive for phone viewing:
   watchdog triggers, execution (with the labeled simulated fill), perception +
   proof anchors.
 - `/bitget/backtest` — PnL/return/drawdown/win-rate, equity-curve chart, trade
-  table, rejections; the source (real vs. synthetic) is labeled.
+  table and rejections. Retrieval failures stop the run; there is no synthetic
+  fallback.
 - `/bitget/replay/[id]` — hash-chain integrity, truth anchors, per-stage outputs
   (including fired watchdog triggers), reject codes, and an event timeline.
 

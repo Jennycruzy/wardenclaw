@@ -57,10 +57,10 @@ module, the sentiment-reversal exit, and the runtime strategy-compiler wiring.
    chain execution in this repo (Bitget paper only).
 4. **Any private key touching backend or DB?** No keys exist in this system;
    Bitget credentials are optional, env-only, never logged or stored.
-5. **Can the agent duplicate a trade after crash-restart?** The paper book is
-   in-memory per run (each run is a fresh labeled book + fresh audit file), so a
-   restart cannot duplicate a prior run's trade; it starts a new clearly-named
-   run. Cross-restart position persistence is a known limitation (below).
+5. **Can the agent duplicate a trade after crash-restart?** The console paper
+   book is atomically persisted under `data/runtime/paper-book.json` and restored
+   on restart. Historical settlements are deduplicated by mandate ID in the
+   records view.
 6. **Allowlist keyed by contract address everywhere?** N/A on Bitget (exchange
    symbols, not contracts); the universe is pinned in `universe.ts` and verified
    against the live spot API; unknown symbols fail loudly.
@@ -106,9 +106,9 @@ module, the sentiment-reversal exit, and the runtime strategy-compiler wiring.
 
 ## Known limitations (stated plainly)
 
-- Paper positions do not persist across process restarts; each run is a fresh,
-  clearly-labeled book. Acceptable for a paper demo; would need DB persistence
-  for anything longer-lived.
+- The current console book persists across restarts, but three early historical
+  entry fills predate persistence and have no settlement event. They remain
+  explicitly labeled as unresolved entry-only records.
 - The Agent Hub HTTP (non-MCP) surface remains unverified; the MCP server is the
   verified integration. The HTTP adapter stays fail-loud.
 - xStock history is shallow (the listings are recent), so the reactor
