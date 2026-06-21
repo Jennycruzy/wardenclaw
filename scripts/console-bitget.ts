@@ -52,6 +52,7 @@ import {
   type BitgetAgentConfig,
   type BitgetCandle,
   type DerivativesSentiment,
+  type PaperBookState,
 } from "@wardenclaw/bitget-adapter";
 
 // ── ANSI helpers ──────────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ let runCommand: (line: string) => Promise<void> = async () => {};
 const RUNTIME_DIR = join(process.cwd(), "data", "runtime");
 const LIVE_STATE_PATH = join(RUNTIME_DIR, "bitget-live.json");
 const COMMAND_QUEUE_PATH = join(RUNTIME_DIR, "bitget-commands.jsonl");
+const PAPER_BOOK_PATH = join(RUNTIME_DIR, "paper-book.json");
 let lastCommandId = 0;
 let publishLiveState: () => void = () => {};
 
@@ -568,7 +570,13 @@ async function main(): Promise<void> {
   const auditPath = join(auditDir, `${runId}.jsonl`);
   const mandatesPath = join(auditDir, `${runId}.mandates.jsonl`);
   const audit = new AuditLogger(auditPath);
-  const book = new PaperBook(10_000);
+  let restoredBook: PaperBookState | undefined;
+  try {
+    restoredBook = JSON.parse(readFileSync(PAPER_BOOK_PATH, "utf8")) as PaperBookState;
+  } catch {
+    // First run or unreadable state: start a clean paper book and persist it.
+  }
+  const book = new PaperBook(10_000, restoredBook);
   const reactor = reactorConfigFromEnv();
 
   // StrategyCompilerAgent: NL intent → deterministic strategy JSON (LLM proposes
@@ -824,6 +832,9 @@ async function main(): Promise<void> {
       const tmp = `${LIVE_STATE_PATH}.tmp`;
       writeFileSync(tmp, JSON.stringify(state));
       renameSync(tmp, LIVE_STATE_PATH);
+      const bookTmp = `${PAPER_BOOK_PATH}.tmp`;
+      writeFileSync(bookTmp, JSON.stringify(book.snapshot()));
+      renameSync(bookTmp, PAPER_BOOK_PATH);
     } catch {
       // Publishing is best-effort; the terminal console must never die over it.
     }

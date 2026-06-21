@@ -47,6 +47,13 @@ export interface PaperTrade {
   reason: "stop" | "signal_exit" | "watchdog" | "manual";
 }
 
+export interface PaperBookState {
+  cashUsd: number;
+  positions: PaperPosition[];
+  trades: PaperTrade[];
+  fills: PaperFill[];
+}
+
 /** Apply slippage against the trader: buys fill higher, sells fill lower. */
 function applySlippage(refPrice: number, side: "buy" | "sell", slippageBps: number): number {
   const factor = slippageBps / 10_000;
@@ -59,8 +66,13 @@ export class PaperBook {
   private readonly trades: PaperTrade[] = [];
   private readonly fills: PaperFill[] = [];
 
-  constructor(startingCashUsd: number) {
-    this.cashUsd = startingCashUsd;
+  constructor(startingCashUsd: number, state?: PaperBookState) {
+    this.cashUsd = state?.cashUsd ?? startingCashUsd;
+    for (const position of state?.positions ?? []) {
+      this.positions.set(position.asset, { ...position });
+    }
+    this.trades.push(...(state?.trades ?? []).map((trade) => ({ ...trade })));
+    this.fills.push(...(state?.fills ?? []).map((fill) => ({ ...fill })));
   }
 
   get cash(): number {
@@ -81,6 +93,15 @@ export class PaperBook {
 
   allFills(): PaperFill[] {
     return [...this.fills];
+  }
+
+  snapshot(): PaperBookState {
+    return {
+      cashUsd: this.cashUsd,
+      positions: this.openPositions().map((position) => ({ ...position })),
+      trades: this.closedTrades().map((trade) => ({ ...trade })),
+      fills: this.allFills().map((fill) => ({ ...fill })),
+    };
   }
 
   /** Mark-to-market equity using a price map (asset → mid price). */

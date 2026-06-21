@@ -62,6 +62,24 @@ describe("PaperBook", () => {
     ).toThrow(/already open/);
   });
 
+  it("restores an exact snapshot across process restarts", () => {
+    const first = new PaperBook(1_000);
+    first.open({
+      asset: "NVDAx",
+      refPrice: 100,
+      notionalUsd: 200,
+      stopPrice: 95,
+      slippageBps: 10,
+      timestamp: "2026-06-21T00:00:00.000Z",
+    });
+    const restored = new PaperBook(1_000, first.snapshot());
+
+    expect(restored.cash).toBe(first.cash);
+    expect(restored.openPositions()).toEqual(first.openPositions());
+    expect(restored.allFills()).toEqual(first.allFills());
+    expect(restored.equity({ NVDAx: 105 })).toBe(first.equity({ NVDAx: 105 }));
+  });
+
   it("rejects opening beyond available cash", () => {
     const book = new PaperBook(100);
     expect(() =>
