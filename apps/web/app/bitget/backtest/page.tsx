@@ -16,7 +16,7 @@ export default function BacktestPage() {
         <EmptyState
           title="No backtest reports yet"
           hint="Run a backtest over a real Bitget symbol. Retrieval failures stop the run; no synthetic fallback is used."
-          command="pnpm backtest:bitget -- NVDAXUSDT"
+          command="pnpm backtest:bitget -- NVDAx"
         />
       </Shell>
     );

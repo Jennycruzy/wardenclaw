@@ -13,12 +13,20 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BitgetPublicMarketData,
+  XSTOCK_UNIVERSE,
   backtestReactor,
   type BitgetCandle,
 } from "@wardenclaw/bitget-adapter";
 
 async function main(): Promise<void> {
-  const symbol = process.argv.slice(2).find((arg) => arg !== "--") ?? "NVDAXUSDT";
+  const requested = process.argv.slice(2).find((arg) => arg !== "--") ?? "NVDAx";
+  const known = XSTOCK_UNIVERSE.find(
+    (item) =>
+      item.display.toLowerCase() === requested.toLowerCase() ||
+      item.underlying.toLowerCase() === requested.toLowerCase() ||
+      item.bitgetSymbol.toLowerCase() === requested.toLowerCase(),
+  );
+  const symbol = known?.bitgetSymbol ?? requested.toUpperCase();
   const md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
   const candles: BitgetCandle[] = await md.getCandles(
     symbol,

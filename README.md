@@ -64,7 +64,7 @@ pnpm evidence:run       # full end-to-end native evidence transcript
 # Reactor / perception layer (real Bitget public data, paper fills)
 pnpm run:bitget-paper
 pnpm console:bitget
-pnpm backtest:bitget -- NVDAXUSDT
+pnpm backtest:bitget -- NVDAx
 pnpm --filter @wardenclaw/web dev            # dashboard on http://localhost:3000
 ```
 
