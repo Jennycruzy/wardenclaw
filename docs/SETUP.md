@@ -10,6 +10,8 @@ Written for someone who does not read code.
   strategy compilation, and audit summaries. The agent runs fully without one (deterministic mode).
 - Optional: Bitget API credentials — only needed to re-test Demo Trading with
   `pnpm verify:bitget-demo-key`. Spot xStocks run on the internal paper engine, which needs no key.
+  A demo key is currently provisioned & verified — see `docs/BITGET_DEMO_KEY.md` for what it does
+  and does not enable (execution stays `internal_paper_engine` because Bitget demo is futures-only).
 
 ## Install
 
