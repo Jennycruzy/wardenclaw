@@ -78,7 +78,13 @@ function main(): void {
     const fwd = candles.slice(entryIdx, entryIdx + FORWARD);
     const sc = scenarioFor(i);
 
-    const leverage = sc.aggressive ? [5, 6, 8][i % 3]! : [1, 2, 2][i % 3]!;
+    // Aggressive scenarios model RECKLESS commands well above the firewall's 3x
+    // hard cap (10–20x is ordinary retail over-leverage). Whether such an order is
+    // actually liquidated is computed by ghostSim over the REAL forward candles,
+    // never assumed: calm names (AAPLx/NVDAx) usually survive, while a volatile
+    // BTC-correlated name (MSTRx/COINx) printing a real drawdown blows up — and the
+    // Warden-clamped order (≤3x) survives the same path. That gap is the evidence.
+    const leverage = sc.aggressive ? [10, 15, 20][i % 3]! : [1, 2, 2][i % 3]!;
     const notional = [150, 300, 500, 800][i % 4]!;
     const intent: TradeIntent = {
       asset: symbol, direction: "long", notionalUsd: notional, leverage,
