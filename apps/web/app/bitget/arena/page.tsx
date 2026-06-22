@@ -46,7 +46,7 @@ interface Finale {
 }
 interface Evaluation {
   intent: { asset: string; direction: string; notionalUsd: number; leverage: number; orderType: string; rawCommand: string };
-  context: { asset: string; assetKnown: boolean; price: number; livePriceUsed: boolean; candleCount: number; volPctile: number; marketOpen: boolean; feedAgeSec: number; signingKeyIsDev: boolean; priceSource: "live_feed" | "cached_candles" | "fallback" };
+  context: { asset: string; assetKnown: boolean; price: number; livePriceUsed: boolean; candleCount: number; volPctile: number; marketOpen: boolean; feedAgeSec: number; signingKeyIsDev: boolean; priceSource: "live_feed" | "cached_candles" | "fallback"; news: { active: boolean; ageMin?: number; direction?: string; confidence?: number; tradeRelevance?: string; confirmed?: boolean; headline?: string } };
   strategy: { verdict: string; mayEmitMandates: boolean; failedChecks: Array<{ check: string; detail: string }> };
   trade: { verdict: string; gates: GateResult[]; gatesFailed: string[]; approvedOrder: ApprovedOrder | null; hedgeLeg: { asset: string; notionalUsd: number; reason: string } | null; modificationReason: string[]; recheckCondition?: string };
   permit: Permit | null;
@@ -228,12 +228,26 @@ export default function ArenaPage() {
                   />
                   <KeyValue k="Vol percentile" v={<span className="flex items-center gap-2">{evalResult.context.volPctile.toFixed(2)}<Badge tone="accent">real candles</Badge></span>} />
                   <KeyValue k="NYSE session" v={<span className="flex items-center gap-2">{evalResult.context.marketOpen ? "open" : "closed"}<Badge tone="accent">clock</Badge></span>} />
+                  <KeyValue
+                    k="Live news"
+                    v={
+                      evalResult.context.news.active ? (
+                        <span className="flex items-center gap-2">
+                          <Badge tone="warn">shock · {evalResult.context.news.ageMin}m</Badge>
+                          <span className="text-ink-muted">{evalResult.context.news.direction} {Math.round((evalResult.context.news.confidence ?? 0) * 100)}% · {evalResult.context.news.confirmed ? "confirmed" : "unconfirmed"}</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">{evalResult.context.news.direction ?? "none"}<Badge tone="neutral">no fresh shock</Badge></span>
+                      )
+                    }
+                  />
                 </div>
               </div>
               <p className="mt-3 text-xs text-ink-faint">
-                <span className="text-pos">Live</span>: price (from the running console&apos;s Agent Hub feed). {" "}
+                <span className="text-pos">Live</span>: price (Agent Hub feed) and the news-shock gates (real classified
+                headlines + shock volume from the running console). {" "}
                 <span className="text-accent">Computed from real cached Bitget candles</span>: volatility, premium reference, session. {" "}
-                <span className="text-ink-muted">Conservative engine defaults</span> (not wired live in the arena): spread, earnings, news-shock, BTC-vol —
+                <span className="text-ink-muted">Conservative engine defaults</span> (not wired live): spread, earnings, BTC realized-vol —
                 those gates stay conservative rather than guess. Nothing here is fabricated.
               </p>
             </Card>

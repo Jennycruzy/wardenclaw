@@ -22,6 +22,7 @@ import {
   ghostCompare,
   resolveSigningKey,
   usingDevSigningKey,
+  DEFAULT_TRADE_PERMIT_CONFIG,
   PermitStore,
   type TradeIntent,
   type TradeDirection,
@@ -37,6 +38,7 @@ import {
   XSTOCK_UNIVERSE,
   type BitgetCandle,
   type XStockSymbol,
+  type PerceptionSignals,
 } from "@wardenclaw/bitget-adapter";
 import { loadBitgetLive, loadFixtureCandles } from "@/lib/data";
 
@@ -129,10 +131,21 @@ export function parseTradeCommand(command: string): { intent: TradeIntent; asset
 
 // ---- Live MarketContext assembly (real feed + real candles) ------------------
 
+interface LiveClassifiedEvent {
+  direction: "positive" | "negative" | "neutral" | "mixed" | "unknown";
+  confidence: number;
+  tradeRelevance: "high" | "medium" | "low";
+  riskFlags?: string[];
+}
 interface LiveSymbolRow {
   symbol: string;
   price: number | null;
-  news?: { event?: string | null } | null;
+  volumeRatio: number | null;
+  news?: {
+    event?: LiveClassifiedEvent | null;
+    summary?: string | null;
+    headlines?: Array<{ headline: string; publishedAt: string }>;
+  } | null;
 }
 
 function liveRowFor(asset: string): LiveSymbolRow | null {
@@ -143,6 +156,66 @@ function liveRowFor(asset: string): LiveSymbolRow | null {
 
 function asBitgetCandles(candles: SimCandle[]): BitgetCandle[] {
   return candles.map((c) => ({ ...c, volume: 0 }));
+}
+
+// A live "news shock" (for the news_first_spike / confirmation gates) is a fresh,
+// directional, market-moving classified event — the same notion the reactor uses.
+// Window tracks the gate's own first-spike minutes so the two stay consistent.
+const NEWS_SHOCK_WINDOW_MIN = DEFAULT_TRADE_PERMIT_CONFIG.newsFirstSpikeMinutes * 3;
+const NEWS_SHOCK_MIN_CONFIDENCE = 0.6;
+/** Volume ratio (current vs trailing) that counts as post-news confirmation; mirrors
+ *  the reactor's BITGET_SHOCK_MIN_VOLUME_RATIO default. */
+const CONFIRM_MIN_VOLUME_RATIO = 1.5;
+
+export interface NewsView {
+  active: boolean;
+  ageMin?: number;
+  direction?: string;
+  confidence?: number;
+  tradeRelevance?: string;
+  confirmed?: boolean;
+  volumeRatio?: number | null;
+  headline?: string;
+}
+
+/** Minutes since the most recent real headline for this symbol (null if none/unparseable). */
+function latestHeadlineAgeMin(row: LiveSymbolRow): number | null {
+  const times = (row.news?.headlines ?? [])
+    .map((h) => Date.parse(h.publishedAt))
+    .filter((t) => Number.isFinite(t));
+  if (times.length === 0) return null;
+  return Math.max(0, Math.round((Date.now() - Math.max(...times)) / 60_000));
+}
+
+/**
+ * Derive the news-gate signals from the live console feed for one symbol. Only a
+ * fresh, directional (positive/negative), high/medium-relevance, confident event
+ * counts as a shock; confirmation is the real shock volume ratio. Anything short of
+ * that leaves the signals undefined so the gates stay conservative (no fabrication).
+ */
+function deriveNewsSignals(row: LiveSymbolRow | null): { signals: PerceptionSignals; news: NewsView } {
+  const ev = row?.news?.event ?? null;
+  const ageMin = row ? latestHeadlineAgeMin(row) : null;
+  const headline = row?.news?.headlines?.[0]?.headline;
+  const base: NewsView = {
+    active: false,
+    ...(ev ? { direction: ev.direction, confidence: ev.confidence, tradeRelevance: ev.tradeRelevance } : {}),
+    ...(ageMin !== null ? { ageMin } : {}),
+    ...(headline ? { headline } : {}),
+  };
+  if (!ev || !row) return { signals: {}, news: base };
+
+  const directional = ev.direction === "positive" || ev.direction === "negative";
+  const relevant = ev.tradeRelevance === "high" || ev.tradeRelevance === "medium";
+  const confident = ev.confidence >= NEWS_SHOCK_MIN_CONFIDENCE;
+  const fresh = ageMin !== null && ageMin <= NEWS_SHOCK_WINDOW_MIN;
+  if (!(directional && relevant && confident && fresh)) return { signals: {}, news: base };
+
+  const confirmed = row.volumeRatio != null && row.volumeRatio >= CONFIRM_MIN_VOLUME_RATIO;
+  return {
+    signals: { newsShockAgeMin: ageMin!, confirmationPresent: confirmed },
+    news: { ...base, active: true, confirmed, volumeRatio: row.volumeRatio ?? null },
+  };
 }
 
 export interface ArenaContext {
@@ -159,6 +232,8 @@ export interface ArenaContext {
     signingKeyIsDev: boolean;
     /** Where the price came from: the live console feed, real cached candles, or a fallback. */
     priceSource: "live_feed" | "cached_candles" | "fallback";
+    /** Live news shock wired into the news_first_spike / confirmation gates. */
+    news: NewsView;
   };
 }
 
@@ -176,6 +251,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
   const lastClose = candles.at(-1)?.close;
   const price = livePrice ?? lastClose ?? 100;
   const nowMs = Date.now();
+  const { signals, news } = deriveNewsSignals(row);
 
   if (!assetKnown || !symbol || candles.length < 2) {
     // Unknown / unsupported asset: hand-built context. The known_asset gate
@@ -200,6 +276,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
         candleCount: candles.length, volPctile: market.volPctile, marketOpen: market.marketOpen,
         feedAgeSec: 0, signingKeyIsDev: usingDevSigningKey(),
         priceSource: priceSourceOf(livePrice, lastClose),
+        news: { active: false },
       },
     };
   }
@@ -217,6 +294,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
     },
     candles: asBitgetCandles(candles),
     nowMs,
+    signals,
   });
 
   return {
@@ -226,6 +304,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
       candleCount: candles.length, volPctile: market.volPctile, marketOpen: market.marketOpen,
       feedAgeSec: market.feedAgeSec, signingKeyIsDev: usingDevSigningKey(),
       priceSource: priceSourceOf(livePrice, lastClose),
+      news,
     },
   };
 }
