@@ -36,6 +36,7 @@ import {
   buildMarketContext,
   findXStock,
   XSTOCK_UNIVERSE,
+  BitgetPublicMarketData,
   type BitgetCandle,
   type XStockSymbol,
   type PerceptionSignals,
@@ -218,6 +219,102 @@ function deriveNewsSignals(row: LiveSymbolRow | null): { signals: PerceptionSign
   };
 }
 
+// ---- BTC realized-vol (macro-analyst path, → btc_correlation HEDGE gate) ------
+//
+// "BTC realized vol rising" is computed from REAL live BTCUSDT candles, the textbook
+// way: close-to-close return volatility over a recent window vs the prior baseline
+// window (non-overlapping). It is only fetched for BTC-correlated names (MSTRx/COINx
+// — the only assets the gate consults), behind a TTL cache with a hard timeout, and
+// fails safe to "unavailable" (→ the gate stays conservative) on any error or thin
+// history. Never fabricated, never throws, never blocks the handler indefinitely.
+
+const BTC_VOL_TTL_MS = 180_000; // refresh at most every 3 min (BTC vol regime is slow)
+const BTC_VOL_FETCH_TIMEOUT_MS = 4_000; // give up fast; fall back to the default
+const BTC_VOL_GRANULARITY = "1h";
+const BTC_VOL_RECENT_WIN = 6; // last ~6h
+const BTC_VOL_BASELINE_WIN = 48; // the prior ~2d, as the baseline
+const BTC_VOL_CANDLES = BTC_VOL_RECENT_WIN + BTC_VOL_BASELINE_WIN + 8; // a little headroom
+const BTC_VOL_RISE_RATIO = 1.25; // recent >= 1.25x baseline counts as "rising"
+const BTC_VOL_MIN_FLOOR = 0.001; // and recent must clear 0.1%/bar so noise can't trigger it
+
+export interface BtcVolView {
+  /** Whether this asset even consults the BTC-vol signal (BTC-correlated only). */
+  applicable: boolean;
+  /** Whether a live reading was obtained (false ⇒ gate used the conservative default). */
+  available: boolean;
+  rising?: boolean;
+  recentVolPct?: number;
+  baselineVolPct?: number;
+}
+
+interface BtcVolReading {
+  rising: boolean;
+  recentVolPct: number;
+  baselineVolPct: number;
+}
+
+const btcMarketData = new BitgetPublicMarketData();
+let btcVolCache: { value: BtcVolReading | null; at: number } | null = null;
+let btcVolInflight: Promise<BtcVolReading | null> | null = null;
+
+/** Standard deviation of a list of returns. */
+function stddev(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const mean = xs.reduce((s, v) => s + v, 0) / xs.length;
+  return Math.sqrt(xs.reduce((s, v) => s + (v - mean) * (v - mean), 0) / xs.length);
+}
+
+function computeBtcVol(closes: number[]): BtcVolReading | null {
+  const rets: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1]! > 0) rets.push((closes[i]! - closes[i - 1]!) / closes[i - 1]!);
+  }
+  if (rets.length < BTC_VOL_RECENT_WIN + BTC_VOL_BASELINE_WIN) return null; // thin history → honest absence
+  const recentRets = rets.slice(-BTC_VOL_RECENT_WIN);
+  const baselineRets = rets.slice(-(BTC_VOL_RECENT_WIN + BTC_VOL_BASELINE_WIN), -BTC_VOL_RECENT_WIN);
+  const recent = stddev(recentRets);
+  const baseline = stddev(baselineRets);
+  const rising = baseline > 0 && recent >= baseline * BTC_VOL_RISE_RATIO && recent >= BTC_VOL_MIN_FLOOR;
+  return {
+    rising,
+    recentVolPct: Number((recent * 100).toFixed(3)),
+    baselineVolPct: Number((baseline * 100).toFixed(3)),
+  };
+}
+
+async function fetchBtcVol(): Promise<BtcVolReading | null> {
+  try {
+    const candles = await Promise.race([
+      btcMarketData.getCandles("BTCUSDT", BTC_VOL_GRANULARITY, BTC_VOL_CANDLES),
+      new Promise<BitgetCandle[]>((_, rej) =>
+        setTimeout(() => rej(new Error("btc vol fetch timeout")), BTC_VOL_FETCH_TIMEOUT_MS),
+      ),
+    ]);
+    const closes = candles.map((c) => c.close).filter((n) => Number.isFinite(n));
+    return computeBtcVol(closes);
+  } catch {
+    return null; // fail-safe: no fabrication; the HEDGE gate stays conservative
+  }
+}
+
+/** Cached BTC realized-vol reading; null when unavailable (→ conservative default). */
+async function getBtcVol(): Promise<BtcVolReading | null> {
+  const now = Date.now();
+  if (btcVolCache && now - btcVolCache.at < BTC_VOL_TTL_MS) return btcVolCache.value;
+  if (btcVolInflight) return btcVolInflight; // coalesce concurrent callers
+  btcVolInflight = fetchBtcVol()
+    .then((value) => {
+      btcVolCache = { value, at: Date.now() };
+      btcVolInflight = null;
+      return value;
+    })
+    .catch(() => {
+      btcVolInflight = null;
+      return null;
+    });
+  return btcVolInflight;
+}
+
 export interface ArenaContext {
   market: MarketContext;
   source: {
@@ -234,6 +331,8 @@ export interface ArenaContext {
     priceSource: "live_feed" | "cached_candles" | "fallback";
     /** Live news shock wired into the news_first_spike / confirmation gates. */
     news: NewsView;
+    /** Live BTC realized-vol wired into the btc_correlation HEDGE gate. */
+    btcVol: BtcVolView;
   };
 }
 
@@ -243,7 +342,7 @@ function priceSourceOf(livePrice: number | null, lastClose: number | undefined):
   return "fallback";
 }
 
-export function buildArenaContext(asset: string, assetKnown: boolean): ArenaContext {
+export async function buildArenaContext(asset: string, assetKnown: boolean): Promise<ArenaContext> {
   const symbol: XStockSymbol | undefined = findXStock(asset);
   const candles = loadFixtureCandles(asset);
   const row = liveRowFor(asset);
@@ -252,6 +351,17 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
   const price = livePrice ?? lastClose ?? 100;
   const nowMs = Date.now();
   const { signals, news } = deriveNewsSignals(row);
+
+  // BTC realized-vol is only consulted for BTC-correlated names (the only assets the
+  // btc_correlation gate reads), so only fetch it for them. Fail-safe to unavailable.
+  const btcCorrelated = symbol?.btcCorrelated === true;
+  const btcReading = btcCorrelated ? await getBtcVol() : null;
+  const btcVol: BtcVolView = {
+    applicable: btcCorrelated,
+    available: btcReading !== null,
+    ...(btcReading ? { rising: btcReading.rising, recentVolPct: btcReading.recentVolPct, baselineVolPct: btcReading.baselineVolPct } : {}),
+  };
+  if (btcReading) signals.btcRealizedVolRising = btcReading.rising;
 
   if (!assetKnown || !symbol || candles.length < 2) {
     // Unknown / unsupported asset: hand-built context. The known_asset gate
@@ -277,6 +387,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
         feedAgeSec: 0, signingKeyIsDev: usingDevSigningKey(),
         priceSource: priceSourceOf(livePrice, lastClose),
         news: { active: false },
+        btcVol,
       },
     };
   }
@@ -305,6 +416,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
       feedAgeSec: market.feedAgeSec, signingKeyIsDev: usingDevSigningKey(),
       priceSource: priceSourceOf(livePrice, lastClose),
       news,
+      btcVol,
     },
   };
 }
@@ -368,9 +480,9 @@ export interface ArenaEvaluation {
 
 let seq = 0;
 
-export function evaluateArena(command: string): ArenaEvaluation {
+export async function evaluateArena(command: string): Promise<ArenaEvaluation> {
   const { intent, assetKnown } = parseTradeCommand(command);
-  const { market, source } = buildArenaContext(intent.asset, assetKnown);
+  const { market, source } = await buildArenaContext(intent.asset, assetKnown);
 
   // Checkpoint 1 — Playbook Shield over the same phrase (strategy view).
   const audit = auditStrategy({ strategy: command, signingKey: SIGNING_KEY });

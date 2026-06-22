@@ -46,7 +46,7 @@ interface Finale {
 }
 interface Evaluation {
   intent: { asset: string; direction: string; notionalUsd: number; leverage: number; orderType: string; rawCommand: string };
-  context: { asset: string; assetKnown: boolean; price: number; livePriceUsed: boolean; candleCount: number; volPctile: number; marketOpen: boolean; feedAgeSec: number; signingKeyIsDev: boolean; priceSource: "live_feed" | "cached_candles" | "fallback"; news: { active: boolean; ageMin?: number; direction?: string; confidence?: number; tradeRelevance?: string; confirmed?: boolean; headline?: string } };
+  context: { asset: string; assetKnown: boolean; price: number; livePriceUsed: boolean; candleCount: number; volPctile: number; marketOpen: boolean; feedAgeSec: number; signingKeyIsDev: boolean; priceSource: "live_feed" | "cached_candles" | "fallback"; news: { active: boolean; ageMin?: number; direction?: string; confidence?: number; tradeRelevance?: string; confirmed?: boolean; headline?: string }; btcVol: { applicable: boolean; available: boolean; rising?: boolean; recentVolPct?: number; baselineVolPct?: number } };
   strategy: { verdict: string; mayEmitMandates: boolean; failedChecks: Array<{ check: string; detail: string }> };
   trade: { verdict: string; gates: GateResult[]; gatesFailed: string[]; approvedOrder: ApprovedOrder | null; hedgeLeg: { asset: string; notionalUsd: number; reason: string } | null; modificationReason: string[]; recheckCondition?: string };
   permit: Permit | null;
@@ -241,14 +241,29 @@ export default function ArenaPage() {
                       )
                     }
                   />
+                  {evalResult.context.btcVol.applicable && (
+                    <KeyValue
+                      k="BTC realized-vol"
+                      v={
+                        evalResult.context.btcVol.available ? (
+                          <span className="flex items-center gap-2">
+                            <Badge tone={evalResult.context.btcVol.rising ? "warn" : "pos"}>{evalResult.context.btcVol.rising ? "rising" : "calm"}</Badge>
+                            <span className="text-ink-muted">{evalResult.context.btcVol.recentVolPct}% vs {evalResult.context.btcVol.baselineVolPct}%</span>
+                          </span>
+                        ) : (
+                          <Badge tone="neutral">unavailable — gate conservative</Badge>
+                        )
+                      }
+                    />
+                  )}
                 </div>
               </div>
               <p className="mt-3 text-xs text-ink-faint">
-                <span className="text-pos">Live</span>: price (Agent Hub feed) and the news-shock gates (real classified
-                headlines + shock volume from the running console). {" "}
+                <span className="text-pos">Live</span>: price (Agent Hub feed), the news-shock gates (real classified
+                headlines + shock volume), and — for BTC-correlated names — BTC realized-vol (live BTCUSDT candles). {" "}
                 <span className="text-accent">Computed from real cached Bitget candles</span>: volatility, premium reference, session. {" "}
-                <span className="text-ink-muted">Conservative engine defaults</span> (not wired live): spread, earnings, BTC realized-vol —
-                those gates stay conservative rather than guess. Nothing here is fabricated.
+                <span className="text-ink-muted">Conservative engine defaults</span> (not wired live): spread, earnings.
+                Every gate stays conservative rather than guess; nothing here is fabricated.
               </p>
             </Card>
 

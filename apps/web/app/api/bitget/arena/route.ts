@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     if (!command) return NextResponse.json({ error: "missing command" }, { status: 400 });
     if (command.length > 200) return NextResponse.json({ error: "command too long" }, { status: 422 });
     try {
-      return NextResponse.json(evaluateArena(command));
+      return NextResponse.json(await evaluateArena(command));
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 500 });
     }
