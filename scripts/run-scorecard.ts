@@ -43,6 +43,20 @@ function volPercentile(candles: SimCandle[], idx: number, win = 12): number {
   return Number(rank.toFixed(3));
 }
 
+/** Deepest peak-to-trough drawdown reachable within any forward window — the real
+ *  downside a long faces. Drives which names can plausibly liquidate at a given
+ *  leverage; computed straight from the candles, never assumed. */
+function deepestForwardDrawdown(candles: SimCandle[], forward: number): number {
+  let worst = 0;
+  for (let i = 0; i + 1 < candles.length; i++) {
+    const entry = candles[i]!.close;
+    let lo = entry;
+    for (let k = i + 1; k < Math.min(candles.length, i + 1 + forward); k++) lo = Math.min(lo, candles[k]!.low);
+    worst = Math.max(worst, (entry - lo) / entry);
+  }
+  return worst;
+}
+
 interface Scenario { tag: string; ctx: Partial<MarketContext>; aggressive: boolean }
 function scenarioFor(i: number): Scenario {
   switch (i % 5) {
@@ -63,28 +77,57 @@ interface Row {
 }
 
 function main(): void {
-  const COUNT = 60;
+  const COUNT = 120;
   const FORWARD = 48;
   const rows: Row[] = [];
   const gateFreq: Record<string, number> = {};
 
+  // RECKLESS commands (10–20x, well above the firewall's 3x hard cap) are routed to
+  // the names whose REAL candle history can actually reach a liquidation at that
+  // leverage — derived from the data, not hand-picked — so the evidence spreads
+  // across every volatile ticker instead of piling onto one. Sane commands rotate
+  // across the whole universe so the calm names stay exercised. Whether any order is
+  // liquidated is computed by ghostSim over the real forward path, never assumed: a
+  // reckless long into a genuine drawdown blows up while the Warden-clamped order
+  // (≤3x) survives the same candles. That gap is the evidence.
+  const AGGRESSIVE_LEVERAGE = [10, 15, 20];
+  const SANE_LEVERAGE = [1, 2, 2];
+  const liqDepthAtMaxLev = 1 / Math.max(...AGGRESSIVE_LEVERAGE) - 0.005; // 20x ⇒ 4.5%
+  const depthBySymbol = new Map(
+    SYMBOLS.map((s) => [s, deepestForwardDrawdown(data.series[s]!.candles, FORWARD)] as const),
+  );
+  const LIQUIDATION_CAPABLE = SYMBOLS
+    .filter((s) => depthBySymbol.get(s)! >= liqDepthAtMaxLev)
+    .sort((a, b) => depthBySymbol.get(b)! - depthBySymbol.get(a)!);
+
+  let aggSeen = 0;
+  let calmSeen = 0;
   for (let i = 0; i < COUNT; i++) {
-    const symbol = SYMBOLS[i % SYMBOLS.length]!;
+    const sc = scenarioFor(i);
+    // Decouple BOTH symbol and leverage from the scenario index, on their own counter,
+    // so reckless commands cover every liquidation-capable name at every leverage tier
+    // (incl. the top tier) — balanced coverage, never a lucky alignment that hides a
+    // name from the leverage that would expose its real drawdown. Sane commands rotate
+    // across the whole universe so the calm names stay exercised.
+    let symbol: string;
+    let leverage: number;
+    if (sc.aggressive) {
+      symbol = LIQUIDATION_CAPABLE[aggSeen % LIQUIDATION_CAPABLE.length]!;
+      leverage = AGGRESSIVE_LEVERAGE[Math.floor(aggSeen / LIQUIDATION_CAPABLE.length) % AGGRESSIVE_LEVERAGE.length]!;
+      aggSeen++;
+    } else {
+      symbol = SYMBOLS[calmSeen % SYMBOLS.length]!;
+      leverage = SANE_LEVERAGE[calmSeen % SANE_LEVERAGE.length]!;
+      calmSeen++;
+    }
     const series = data.series[symbol]!;
     const candles = series.candles;
-    // Spread entries deterministically across the usable window.
-    const entryIdx = 12 + ((i * 7) % (candles.length - FORWARD - 12));
+    // Entry spread deterministically across the usable window. Stride 11 is coprime
+    // to the window length (140), so all 60 commands land on distinct entries — no
+    // aliasing that would replay the same candle path and double-count a liquidation.
+    const entryIdx = 12 + ((i * 11) % (candles.length - FORWARD - 12));
     const entry = candles[entryIdx]!;
     const fwd = candles.slice(entryIdx, entryIdx + FORWARD);
-    const sc = scenarioFor(i);
-
-    // Aggressive scenarios model RECKLESS commands well above the firewall's 3x
-    // hard cap (10–20x is ordinary retail over-leverage). Whether such an order is
-    // actually liquidated is computed by ghostSim over the REAL forward candles,
-    // never assumed: calm names (AAPLx/NVDAx) usually survive, while a volatile
-    // BTC-correlated name (MSTRx/COINx) printing a real drawdown blows up — and the
-    // Warden-clamped order (≤3x) survives the same path. That gap is the evidence.
-    const leverage = sc.aggressive ? [10, 15, 20][i % 3]! : [1, 2, 2][i % 3]!;
     const notional = [150, 300, 500, 800][i % 4]!;
     const intent: TradeIntent = {
       asset: symbol, direction: "long", notionalUsd: notional, leverage,
