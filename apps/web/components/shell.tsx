@@ -9,6 +9,7 @@ export interface NavItem {
 const BITGET_NAV: NavItem[] = [
   { href: "/bitget", label: "Overview" },
   { href: "/bitget/firewall", label: "Firewall" },
+  { href: "/bitget/arena", label: "Arena" },
   { href: "/bitget/records", label: "Records" },
   { href: "/bitget/mandates", label: "Mandates" },
   { href: "/bitget/backtest", label: "Backtest" },
