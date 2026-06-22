@@ -46,7 +46,7 @@ interface Finale {
 }
 interface Evaluation {
   intent: { asset: string; direction: string; notionalUsd: number; leverage: number; orderType: string; rawCommand: string };
-  context: { asset: string; assetKnown: boolean; price: number; livePriceUsed: boolean; candleCount: number; volPctile: number; marketOpen: boolean; feedAgeSec: number; signingKeyIsDev: boolean };
+  context: { asset: string; assetKnown: boolean; price: number; livePriceUsed: boolean; candleCount: number; volPctile: number; marketOpen: boolean; feedAgeSec: number; signingKeyIsDev: boolean; priceSource: "live_feed" | "cached_candles" | "fallback" };
   strategy: { verdict: string; mayEmitMandates: boolean; failedChecks: Array<{ check: string; detail: string }> };
   trade: { verdict: string; gates: GateResult[]; gatesFailed: string[]; approvedOrder: ApprovedOrder | null; hedgeLeg: { asset: string; notionalUsd: number; reason: string } | null; modificationReason: string[]; recheckCondition?: string };
   permit: Permit | null;
@@ -92,6 +92,12 @@ const VERIFIER_STEPS: Array<{ reason: string; label: string }> = [
 const fmtUsd = (n: number): string =>
   `$${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 const short = (s: string, n = 16): string => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+function SourceTag({ source }: { source: "live_feed" | "cached_candles" | "fallback" }) {
+  if (source === "live_feed") return <Badge tone="pos">live feed</Badge>;
+  if (source === "cached_candles") return <Badge tone="accent">cached real candle</Badge>;
+  return <Badge tone="neutral">fallback</Badge>;
+}
 
 export default function ArenaPage() {
   const [command, setCommand] = useState("");
@@ -216,12 +222,20 @@ export default function ArenaPage() {
                 <div className="rounded-lg border border-line p-3">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Market context</p>
                   <KeyValue k="Known asset" v={evalResult.context.assetKnown ? "yes" : "NO — fail-closed"} />
-                  <KeyValue k="Price" v={fmtUsd(evalResult.context.price)} />
-                  <KeyValue k="Source" v={evalResult.context.livePriceUsed ? "live console feed" : "cached real candles"} />
-                  <KeyValue k="Vol percentile" v={evalResult.context.volPctile.toFixed(2)} />
-                  <KeyValue k="NYSE session" v={evalResult.context.marketOpen ? "open" : "closed"} />
+                  <KeyValue
+                    k="Price"
+                    v={<span className="flex items-center gap-2">{fmtUsd(evalResult.context.price)}<SourceTag source={evalResult.context.priceSource} /></span>}
+                  />
+                  <KeyValue k="Vol percentile" v={<span className="flex items-center gap-2">{evalResult.context.volPctile.toFixed(2)}<Badge tone="accent">real candles</Badge></span>} />
+                  <KeyValue k="NYSE session" v={<span className="flex items-center gap-2">{evalResult.context.marketOpen ? "open" : "closed"}<Badge tone="accent">clock</Badge></span>} />
                 </div>
               </div>
+              <p className="mt-3 text-xs text-ink-faint">
+                <span className="text-pos">Live</span>: price (from the running console&apos;s Agent Hub feed). {" "}
+                <span className="text-accent">Computed from real cached Bitget candles</span>: volatility, premium reference, session. {" "}
+                <span className="text-ink-muted">Conservative engine defaults</span> (not wired live in the arena): spread, earnings, news-shock, BTC-vol —
+                those gates stay conservative rather than guess. Nothing here is fabricated.
+              </p>
             </Card>
 
             {/* Checkpoint 1 — Playbook Shield */}

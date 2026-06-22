@@ -157,7 +157,15 @@ export interface ArenaContext {
     marketOpen: boolean;
     feedAgeSec: number;
     signingKeyIsDev: boolean;
+    /** Where the price came from: the live console feed, real cached candles, or a fallback. */
+    priceSource: "live_feed" | "cached_candles" | "fallback";
   };
+}
+
+function priceSourceOf(livePrice: number | null, lastClose: number | undefined): ArenaContext["source"]["priceSource"] {
+  if (livePrice !== null) return "live_feed";
+  if (lastClose !== undefined) return "cached_candles";
+  return "fallback";
 }
 
 export function buildArenaContext(asset: string, assetKnown: boolean): ArenaContext {
@@ -191,6 +199,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
         asset, assetKnown: market.knownAsset, price, livePriceUsed: livePrice !== null,
         candleCount: candles.length, volPctile: market.volPctile, marketOpen: market.marketOpen,
         feedAgeSec: 0, signingKeyIsDev: usingDevSigningKey(),
+        priceSource: priceSourceOf(livePrice, lastClose),
       },
     };
   }
@@ -216,6 +225,7 @@ export function buildArenaContext(asset: string, assetKnown: boolean): ArenaCont
       asset, assetKnown: true, price, livePriceUsed: livePrice !== null,
       candleCount: candles.length, volPctile: market.volPctile, marketOpen: market.marketOpen,
       feedAgeSec: market.feedAgeSec, signingKeyIsDev: usingDevSigningKey(),
+      priceSource: priceSourceOf(livePrice, lastClose),
     },
   };
 }
