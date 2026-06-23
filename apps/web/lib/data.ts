@@ -424,9 +424,33 @@ export function listBacktests(): BacktestReport[] {
   return reports;
 }
 
-/** Headline report for the backtest page: strictly the newest generated report. */
+/** The newest report for each distinct symbol/source, newest-symbol first. */
+export function latestBacktestPerSymbol(): BacktestReport[] {
+  const seen = new Set<string>();
+  const out: BacktestReport[] = [];
+  for (const r of listBacktests()) {
+    if (seen.has(r.source)) continue;
+    seen.add(r.source);
+    out.push(r);
+  }
+  return out;
+}
+
+/** The latest report for a specific source (e.g. "bitget_public:TSLAONUSDT"). */
+export function getBacktestBySource(source: string): BacktestReport | null {
+  return latestBacktestPerSymbol().find((r) => r.source === source) ?? null;
+}
+
+/**
+ * Headline report for the backtest page. Prefers the most recently generated
+ * report that actually has trades — a symbol whose disciplined gate happened to
+ * fire — so the page leads with a meaningful result rather than a 0-trade run.
+ * Falls back to the newest report overall when nothing has traded yet.
+ */
 export function getLatestBacktest(): BacktestReport | null {
-  return listBacktests()[0] ?? null;
+  const perSymbol = latestBacktestPerSymbol();
+  const withTrades = perSymbol.find((r) => r.summary.numTrades > 0);
+  return withTrades ?? perSymbol[0] ?? null;
 }
 
 // ---- Environment / mode readouts -----------------------------------------

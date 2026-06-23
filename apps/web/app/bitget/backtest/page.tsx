@@ -1,13 +1,33 @@
+import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { Card, EmptyState, Stat, SectionTitle, Badge } from "@/components/ui";
 import { EquityCurve } from "@/components/charts";
-import { getLatestBacktest, listBacktests } from "@/lib/data";
+import {
+  getLatestBacktest,
+  getBacktestBySource,
+  latestBacktestPerSymbol,
+  listBacktests,
+} from "@/lib/data";
 import { usd, pct, num, shortTime, signClass } from "@/lib/format";
+import { XSTOCK_UNIVERSE } from "@wardenclaw/bitget-adapter";
 
 export const dynamic = "force-dynamic";
 
-export default function BacktestPage() {
-  const report = getLatestBacktest();
+/** Friendly display label for a backtest source like "bitget_public:TSLAONUSDT". */
+function symbolLabel(source: string): string {
+  const sym = source.split(":").pop() ?? source;
+  const match = XSTOCK_UNIVERSE.find((x) => x.bitgetSymbol.toLowerCase() === sym.toLowerCase());
+  return match?.display ?? sym;
+}
+
+export default function BacktestPage({
+  searchParams,
+}: {
+  searchParams?: { symbol?: string };
+}) {
+  const perSymbol = latestBacktestPerSymbol();
+  const selected = searchParams?.symbol ? getBacktestBySource(searchParams.symbol) : null;
+  const report = selected ?? getLatestBacktest();
   const all = listBacktests();
 
   if (!report) {
@@ -28,13 +48,43 @@ export default function BacktestPage() {
   return (
     <Shell
       title="Backtest"
-      subtitle={`Source: ${report.source} · ${num(report.bars)} bars · ${shortTime(report.generatedAt)}`}
+      subtitle={`${symbolLabel(report.source)} · ${num(report.bars)} bars · ${shortTime(report.generatedAt)}`}
       actions={
         <Badge tone={stale ? "warn" : "pos"}>
           {stale ? "Real candles · stale report" : "Real Bitget candles · fresh"}
         </Badge>
       }
     >
+      {perSymbol.length > 1 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {perSymbol.map((r) => {
+            const active = r.source === report.source;
+            const traded = r.summary.numTrades > 0;
+            return (
+              <Link
+                key={r.source}
+                href={`/bitget/backtest?symbol=${encodeURIComponent(r.source)}`}
+                scroll={false}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition ${
+                  active
+                    ? "border-accent/50 bg-accent/10 text-accent shadow-glow"
+                    : "border-line bg-bg-subtle text-ink-muted hover:border-accent/30 hover:text-ink"
+                }`}
+              >
+                {symbolLabel(r.source)}
+                <span
+                  className={`tabular text-[10px] ${
+                    traded ? (active ? "text-accent" : "text-pos") : "text-ink-faint"
+                  }`}
+                >
+                  {r.summary.numTrades}t
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
       {report.thresholds ? (
         <p className="mb-3 text-xs text-ink-faint">
           Gate (matches the live agent):{" "}
@@ -128,7 +178,8 @@ export default function BacktestPage() {
           )}
           {all.length > 1 ? (
             <p className="mt-4 border-t border-line/60 pt-3 text-xs text-ink-faint">
-              {all.length} reports on disk · showing the most recent.
+              {perSymbol.length} symbols · {all.length} reports on disk · showing{" "}
+              {selected ? "the selected symbol" : "the latest symbol that traded"}.
             </p>
           ) : null}
         </Card>
