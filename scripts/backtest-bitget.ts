@@ -9,12 +9,14 @@
  * replacing the requested market with a synthetic series.
  */
 
+import "dotenv/config"; // load .env so the backtest uses the live agent's thresholds
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BitgetPublicMarketData,
   XSTOCK_UNIVERSE,
   backtestReactor,
+  reactorBacktestConfigFromEnv,
   type BitgetCandle,
 } from "@wardenclaw/bitget-adapter";
 
@@ -27,20 +29,43 @@ async function main(): Promise<void> {
       item.bitgetSymbol.toLowerCase() === requested.toLowerCase(),
   );
   const symbol = known?.bitgetSymbol ?? requested.toUpperCase();
-  const md = new BitgetPublicMarketData({ baseUrl: process.env.BITGET_PUBLIC_BASE_URL });
+  // Treat blank env vars as unset (dotenv loads `KEY=` as ""), so they fall back
+  // to defaults rather than sending an empty base URL / granularity to Bitget.
+  const envOr = (v: string | undefined, fallback: string): string => {
+    const t = (v ?? "").trim();
+    return t === "" ? fallback : t;
+  };
+  // Default to a wider window than the live poll so shocks have room to appear;
+  // Bitget's spot candles endpoint caps a single request at 1000 bars.
+  const barLimit = Math.min(
+    1000,
+    Math.max(2, Number(process.env.BITGET_BACKTEST_BARS ?? 1000) || 1000),
+  );
+  const baseUrl = envOr(process.env.BITGET_PUBLIC_BASE_URL, "https://api.bitget.com");
+  const md = new BitgetPublicMarketData({ baseUrl });
   const candles: BitgetCandle[] = await md.getCandles(
     symbol,
-    process.env.BITGET_CANDLE_GRANULARITY ?? "5min",
-    200,
+    envOr(process.env.BITGET_CANDLE_GRANULARITY, "5min"),
+    barLimit,
   );
   if (candles.length < 2) throw new Error(`Bitget returned insufficient candles for ${symbol}`);
   const source = `bitget_public:${symbol}`;
 
-  const result = backtestReactor(candles);
+  // Use the SAME thresholds the live paper agent runs on, so the backtest
+  // reflects deployed behavior rather than the stricter hard-coded defaults.
+  const cfg = reactorBacktestConfigFromEnv();
+  const result = backtestReactor(candles, cfg);
   const report = {
     source,
     generatedAt: new Date().toISOString(),
     bars: candles.length,
+    thresholds: {
+      shockWindowBars: cfg.reactor.shock.windowBars,
+      shockMinMagnitudePct: cfg.reactor.shock.minMagnitudePct,
+      shockMinVolumeRatio: cfg.reactor.shock.minVolumeRatio,
+      cooldownBars: cfg.reactor.cooldownBars,
+      netEdgeMinBps: cfg.netEdgeMinBps,
+    },
     summary: {
       numTrades: result.numTrades,
       pnlUsd: Number(result.pnlUsd.toFixed(2)),

@@ -380,6 +380,14 @@ export interface BacktestReport {
   source: string;
   generatedAt: string;
   bars: number;
+  /** Effective reactor thresholds used for this run (present on newer reports). */
+  thresholds?: {
+    shockWindowBars: number;
+    shockMinMagnitudePct: number;
+    shockMinVolumeRatio: number;
+    cooldownBars: number;
+    netEdgeMinBps: number;
+  };
   summary: {
     numTrades: number;
     pnlUsd: number;

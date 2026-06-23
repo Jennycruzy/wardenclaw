@@ -6,6 +6,7 @@
  * the batch exits non-zero; synthetic data is never substituted.
  */
 
+import "dotenv/config"; // so spawned backtests inherit the live agent's thresholds
 import { spawnSync } from "node:child_process";
 import { TRADEABLE_XSTOCKS } from "@wardenclaw/bitget-adapter";
 

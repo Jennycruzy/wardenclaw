@@ -7,7 +7,12 @@
 
 import { runBacktest, type Bar, type BacktestResult, type SignalFn } from "@wardenclaw/core";
 import type { BitgetCandle } from "./types.js";
-import { detectShock, DEFAULT_REACTOR_CONFIG, type ReactorConfig } from "./reactor.js";
+import {
+  detectShock,
+  DEFAULT_REACTOR_CONFIG,
+  reactorConfigFromEnv,
+  type ReactorConfig,
+} from "./reactor.js";
 
 export interface ReactorBacktestConfig {
   reactor: ReactorConfig;
@@ -28,6 +33,32 @@ export const DEFAULT_REACTOR_BACKTEST_CONFIG: ReactorBacktestConfig = {
   netEdgeMinBps: 15,
   slippageBps: 8,
 };
+
+/**
+ * Backtest config that uses the SAME shock/cooldown thresholds the live paper
+ * agent runs on (BITGET_SHOCK_* etc.), so the backtest reflects the deployed
+ * behavior instead of the stricter hard-coded defaults. Backtest-only sizing and
+ * friction knobs are env-overridable too, falling back to the defaults above.
+ */
+export function reactorBacktestConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): ReactorBacktestConfig {
+  const num = (v: string | undefined, fallback: number): number => {
+    if (v === undefined || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const d = DEFAULT_REACTOR_BACKTEST_CONFIG;
+  return {
+    reactor: reactorConfigFromEnv(env),
+    startingCapitalUsd: num(env.BITGET_BACKTEST_CAPITAL_USD, d.startingCapitalUsd),
+    perTradeRiskPct: num(env.BITGET_PER_TRADE_RISK_PCT, d.perTradeRiskPct),
+    stopAtrMultiple: num(env.BITGET_STOP_ATR_MULTIPLE, d.stopAtrMultiple),
+    maxPositionPct: num(env.BITGET_MAX_POSITION_PCT, d.maxPositionPct),
+    netEdgeMinBps: num(env.BITGET_NET_EDGE_MIN_BPS, d.netEdgeMinBps),
+    slippageBps: num(env.BITGET_SLIPPAGE_BPS, d.slippageBps),
+  };
+}
 
 /** Convert candles to the core backtester's Bar shape (price + atrPct). */
 export function candlesToBars(candles: BitgetCandle[], atrPeriod = 14): Bar[] {

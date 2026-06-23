@@ -35,6 +35,17 @@ export default function BacktestPage() {
         </Badge>
       }
     >
+      {report.thresholds ? (
+        <p className="mb-3 text-xs text-ink-faint">
+          Gate (matches the live agent):{" "}
+          <span className="font-mono text-ink-muted">
+            shock ≥ {(report.thresholds.shockMinMagnitudePct * 100).toFixed(1)}% over{" "}
+            {report.thresholds.shockWindowBars} bars on ≥ {report.thresholds.shockMinVolumeRatio}× volume
+          </span>{" "}
+          · cooldown {report.thresholds.cooldownBars} bars · net-edge ≥ {report.thresholds.netEdgeMinBps} bps
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Total return"
@@ -61,10 +72,13 @@ export default function BacktestPage() {
         <Card className="lg:col-span-2">
           <SectionTitle title="Trades" />
           {report.trades.length === 0 ? (
-            <p className="py-8 text-center text-xs text-ink-faint">
-              No trades in this window — the calibrated shock threshold is deliberately
-              selective and this symbol printed no qualifying shock. The reactor refusing
-              to trade here is the discipline working, not an error.
+            <p className="mx-auto max-w-md py-8 text-center text-xs leading-relaxed text-ink-faint">
+              No trades across {num(report.bars)} bars — the shock gate{" "}
+              {report.thresholds
+                ? `(≥ ${(report.thresholds.shockMinMagnitudePct * 100).toFixed(1)}% over ${report.thresholds.shockWindowBars} bars on ≥ ${report.thresholds.shockMinVolumeRatio}× volume) `
+                : ""}
+              is deliberately selective and this symbol printed no qualifying shock in the
+              window. The reactor refusing to trade here is the discipline working, not an error.
             </p>
           ) : (
             <div className="overflow-x-auto">
