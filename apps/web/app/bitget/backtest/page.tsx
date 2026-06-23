@@ -140,12 +140,13 @@ export default function BacktestPage({
             </div>
           ) : null}
           {live.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
-                Live gate
-              </span>
-              {live.map(renderChip)}
-            </div>
+            <details className="group">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line bg-bg-subtle px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint transition hover:border-accent/30 hover:text-ink [&::-webkit-details-marker]:hidden">
+                <span className="transition group-open:rotate-90">▸</span>
+                Show all runs · live gate ({live.length})
+              </summary>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">{live.map(renderChip)}</div>
+            </details>
           ) : null}
         </div>
       ) : null}
