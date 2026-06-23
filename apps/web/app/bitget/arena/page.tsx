@@ -422,6 +422,18 @@ export default function ArenaPage() {
                     })}
                   </div>
 
+                  {attackResults.intact?.validation.ok && (
+                    <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-pos/40 bg-pos/10 px-3 py-2 text-sm text-pos shadow-glow animate-fade-up">
+                      <span className="text-base leading-none">✓</span>
+                      <span>
+                        <span className="font-semibold">Genuine permit accepted.</span>{" "}
+                        <span className="text-pos/80">
+                          The executor cleared the one untampered request — every forgery beside it was refused.
+                        </span>
+                      </span>
+                    </div>
+                  )}
+
                   {Object.keys(attackResults).length > 0 && (
                     <AttackMatrix
                       results={attackResults}
