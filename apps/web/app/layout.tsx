@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "WARDENCLAW Stocks — xStock Reactor",
-  description: "Bitget-native xStock earnings/news reactor with a replayable audit trail.",
+  title: "WARDENCLAW — Command Firewall for Bitget xStocks",
+  description: "A two-checkpoint command firewall for Bitget tokenized US stocks: it audits the strategy, then audits each trade command, and proves cryptographically why it acted. Paper / sim only.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

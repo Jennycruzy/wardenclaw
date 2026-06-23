@@ -1,8 +1,9 @@
 # SAFETY
 
 This is hackathon **paper trading**, not investment advice, and not a real-money
-system. This document states the safety properties of the WARDENCLAW Bitget
-xStock reactor and where each one is enforced.
+system. This document states the safety properties of the WARDENCLAW command
+firewall for Bitget xStocks (and the paper reactor underneath) and where each one
+is enforced.
 
 ## No real orders, ever
 

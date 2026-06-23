@@ -21,7 +21,7 @@ export function Shell({
   subtitle,
   actions,
   nav = BITGET_NAV,
-  brand = "Stocks",
+  brand = "Firewall",
   home = "/bitget",
   footer,
 }: {

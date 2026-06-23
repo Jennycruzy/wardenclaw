@@ -6,7 +6,7 @@ nothing is narrated. Run from the repo root after `pnpm install`.
 ## 0. One-time
 
 ```bash
-pnpm typecheck && pnpm test        # 252 tests green
+pnpm typecheck && pnpm test        # 283 tests green
 ```
 
 ## 1. The firewall cannot be bypassed (~30s) — the headline

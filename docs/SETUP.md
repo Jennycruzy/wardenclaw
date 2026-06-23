@@ -1,6 +1,7 @@
 # Setup
 
-WARDENCLAW — Bitget xStock Reactor. Paper trading on **real** Bitget public market data.
+WARDENCLAW — a two-checkpoint command firewall for Bitget xStocks, with a paper-trading
+reactor underneath. Everything runs on **real** Bitget public market data; paper / sim only.
 Written for someone who does not read code.
 
 ## Prerequisites
@@ -30,6 +31,15 @@ pnpm typecheck && pnpm lint && pnpm test
 pnpm verify:integrations            # readiness report (honest about what's wired)
 pnpm verify:llm                     # prove the LLM provider answers (only if configured)
 pnpm verify:bitget-hub              # prove the Bitget Agent Hub MCP integration end-to-end
+```
+
+## Run the firewall demos (paper / sim, screenshot-able)
+
+```bash
+pnpm demo:bypass        # the executor cannot be reached around: 5 attempts, 4 refused
+pnpm demo:closeonly     # survival mode: "buy more" BLOCKED, "reduce 50%" APPROVED
+pnpm run:scorecard      # aggregate backtest evidence from real Bitget candles
+pnpm evidence:run       # full end-to-end native evidence transcript
 ```
 
 ## Run the reactor (paper, real market data)

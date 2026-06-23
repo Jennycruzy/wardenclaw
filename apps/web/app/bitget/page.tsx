@@ -23,8 +23,8 @@ export default function BitgetOverview() {
 
   return (
     <Shell
-      title="xStock Earnings/News Reactor"
-      subtitle="Reacts to earnings/news/sentiment shocks — disciplined enough not to buy the first spike."
+      title="Command Firewall for Bitget xStocks"
+      subtitle="Audits the strategy, then audits each trade command — every verdict deterministic, every permit signed. No valid permit, no execution."
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">
