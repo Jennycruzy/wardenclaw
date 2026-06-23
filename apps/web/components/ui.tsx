@@ -43,9 +43,9 @@ export function Stat({
   valueClass?: string;
 }) {
   return (
-    <Card className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</span>
-      <span className={`tabular text-2xl font-semibold ${valueClass}`}>{value}</span>
+    <Card className="accent-rail card-hover flex flex-col gap-1 overflow-hidden">
+      <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-faint">{label}</span>
+      <span className={`tabular text-2xl font-semibold tracking-tight ${valueClass}`}>{value}</span>
       {sub ? <span className="text-xs text-ink-muted">{sub}</span> : null}
     </Card>
   );

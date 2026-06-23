@@ -144,11 +144,18 @@ export function LiveConsole() {
   const online = Boolean(state?.running) && age !== null && age < 90;
 
   return (
-    <div className="card mt-3 p-5">
+    <div
+      className={`card mt-3 overflow-hidden p-5 transition-shadow duration-500 ${
+        online ? "border-accent/25 shadow-glow" : ""
+      }`}
+    >
+      {online ? (
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-px animate-shimmer bg-gradient-to-r from-transparent via-accent to-transparent" />
+      ) : null}
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
-            Live agent · news sentiment &amp; command console
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-ink-muted">
+            <span className="text-accent">❯</span> Live agent · news sentiment &amp; command console
           </h2>
           <p className="mt-0.5 text-xs text-ink-faint">
             Real headlines (Yahoo Finance RSS) classified by the LLM into the sentiment gate ·
@@ -226,7 +233,7 @@ export function LiveConsole() {
       {online && state?.symbols ? (
         <div className="mb-4 grid gap-2 sm:grid-cols-2">
           {state.symbols.map((s) => (
-            <div key={s.symbol} className="rounded-lg border border-line/60 bg-bg-subtle/40 p-3">
+            <div key={s.symbol} className="group rounded-lg border border-line/60 bg-bg-subtle/40 p-3 transition hover:border-accent/30 hover:bg-bg-subtle/70 hover:shadow-glow">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-mono text-sm font-semibold">{s.symbol}</span>
                 <span className="tabular text-sm">
@@ -277,37 +284,51 @@ export function LiveConsole() {
       ) : null}
 
       {online && state?.events && state.events.length > 0 ? (
-        <div
-          ref={feedRef}
-          className="mb-4 max-h-44 overflow-y-auto rounded-lg border border-line/60 bg-black/40 p-3"
-        >
-          {state.events.map((e, i) => (
-            <p key={i} className="font-mono text-[11px] leading-relaxed text-ink-muted">
-              <span className="text-ink-faint">{e.time}</span> {e.text}
-            </p>
-          ))}
+        <div className="scanlines relative mb-4 overflow-hidden rounded-lg border border-accent/15 bg-black/60 shadow-[inset_0_0_30px_-6px_rgba(0,255,136,0.18)]">
+          <div className="flex items-center gap-1.5 border-b border-line/50 px-3 py-1.5">
+            <span className="h-2 w-2 rounded-full bg-neg/70" />
+            <span className="h-2 w-2 rounded-full bg-warn/70" />
+            <span className="h-2 w-2 rounded-full bg-pos/70" />
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
+              warden://live-feed
+            </span>
+          </div>
+          <div ref={feedRef} className="max-h-44 overflow-y-auto p-3">
+            {state.events.map((e, i) => (
+              <p key={i} className="font-mono text-[11px] leading-relaxed text-pos/80">
+                <span className="text-ink-faint">{e.time}</span>{" "}
+                <span className="text-accent/60">›</span> <span className="text-ink-muted">{e.text}</span>
+              </p>
+            ))}
+          </div>
         </div>
       ) : null}
 
       <div className="flex gap-2">
-        <input
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void submit();
-          }}
-          disabled={!online}
-          placeholder={
-            online
-              ? "type a command — buy NVDAx 500 · close all · news AAPLx · tp 2 · watch · help"
-              : "console offline — commands unavailable"
-          }
-          className="flex-1 rounded-lg border border-line bg-bg-subtle px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
-        />
+        <div className="group flex flex-1 items-center gap-2 rounded-lg border border-line bg-black/40 px-3 transition focus-within:border-accent/60 focus-within:shadow-glow">
+          <span className="font-mono text-sm font-bold text-accent">❯</span>
+          <input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void submit();
+            }}
+            disabled={!online}
+            placeholder={
+              online
+                ? "buy NVDAx 500 · close all · news AAPLx · tp 2 · watch · help"
+                : "console offline — commands unavailable"
+            }
+            className="flex-1 bg-transparent py-2 font-mono text-sm text-ink caret-accent placeholder:text-ink-faint focus:outline-none"
+          />
+          {online && !command ? (
+            <span className="animate-blink font-mono text-sm text-accent">▋</span>
+          ) : null}
+        </div>
         <button
           onClick={() => void submit()}
           disabled={!online || sending || !command.trim()}
-          className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition hover:bg-accent/20 disabled:opacity-40"
+          className="rounded-lg border border-accent/40 bg-accent/10 px-5 py-2 text-sm font-semibold text-accent shadow-[0_0_18px_-8px_rgba(0,255,136,0.9)] transition hover:bg-accent/20 hover:shadow-glow disabled:opacity-40 disabled:shadow-none"
         >
           {sending ? "…" : "run"}
         </button>

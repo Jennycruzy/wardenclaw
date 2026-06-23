@@ -11,25 +11,67 @@
     @apply bg-bg text-ink antialiased;
   }
   body {
+    position: relative;
+    background-color: #050505;
     background-image:
-      radial-gradient(900px 520px at 82% -12%, rgba(0, 255, 136, 0.06), transparent),
-      radial-gradient(700px 420px at -5% 0%, rgba(0, 255, 136, 0.04), transparent);
+      radial-gradient(1100px 620px at 84% -14%, rgba(0, 255, 136, 0.10), transparent 60%),
+      radial-gradient(820px 520px at -8% 4%, rgba(0, 179, 107, 0.08), transparent 60%),
+      radial-gradient(680px 680px at 50% 120%, rgba(0, 255, 136, 0.05), transparent 60%);
     background-attachment: fixed;
   }
-  /* Subtle film grain over the whole app for a premium printed-paper feel. */
+  /* Drifting aurora glow — gives the dashboard a living, "magical" backdrop. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(40% 40% at 20% 30%, rgba(0, 255, 136, 0.10), transparent 70%),
+      radial-gradient(36% 36% at 80% 20%, rgba(0, 179, 107, 0.10), transparent 70%),
+      radial-gradient(44% 44% at 65% 85%, rgba(0, 255, 136, 0.06), transparent 70%);
+    filter: blur(28px);
+    animation: drift 22s ease-in-out infinite;
+  }
+  /* Faint engineering grid + film grain over the whole app. */
   body::before {
     content: "";
     position: fixed;
     inset: 0;
-    z-index: 0;
+    z-index: -1;
     pointer-events: none;
-    opacity: 0.025;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
+    -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
   }
   ::selection {
     background: rgba(0, 255, 136, 0.32);
     color: #000;
+  }
+  /* Slim, on-brand scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 255, 136, 0.25) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 136, 0.18);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 136, 0.4);
+    background-clip: padding-box;
   }
 }
 
@@ -39,9 +81,59 @@
     font-feature-settings: "tnum";
   }
   .card {
-    @apply rounded-2xl border border-line bg-bg-raised/70 shadow-card backdrop-blur-sm;
+    @apply relative rounded-2xl border border-line bg-bg-raised/70 shadow-card backdrop-blur-sm;
+    transition: border-color 0.25s ease, box-shadow 0.3s ease, transform 0.25s ease;
+  }
+  /* Cards lift and pick up a faint neon halo on hover — feels alive without shouting. */
+  .card-hover:hover {
+    @apply -translate-y-0.5 border-accent/30 shadow-glow;
   }
   .hairline {
     @apply border-line;
+  }
+  /* Neon text glow for live/important figures. */
+  .glow-accent {
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.45);
+  }
+  /* Gradient hairline that sits on top of a card to mark it as "active". */
+  .accent-rail::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 16px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.7), transparent);
+  }
+  /* CRT-style scanlines for the live terminal feed. */
+  .scanlines::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 255, 136, 0.035) 0px,
+      rgba(0, 255, 136, 0.035) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    border-radius: inherit;
+  }
+  /* Animated sweeping highlight for "loading / live" surfaces. */
+  .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+  /* Soft fade on the edges of the scrolling ticker. */
+  .ticker-mask {
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   }
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { LiveConsole } from "@/components/live-console";
+import { PriceTicker } from "@/components/price-ticker";
 import { Badge, Card, Dot, EmptyState, Stat, SectionTitle } from "@/components/ui";
 import { ExecutionStatusChip, SignalFamilyChip } from "@/components/chips";
 import { AssetLogo } from "@/components/asset-logo";
@@ -45,6 +46,13 @@ export default function BitgetOverview() {
         </div>
       }
     >
+      <PriceTicker
+        fallbackSymbols={[
+          ...TRADEABLE_XSTOCKS.map((s) => s.display),
+          ...INDEX_PROXIES.map((s) => s.display),
+        ]}
+      />
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Signal Mandates" value={num(stats.total)} sub={`updated ${timeAgo(stats.lastUpdated)}`} />
         <Stat label="Paper entries" value={num(stats.filled)} valueClass="text-pos" sub="filled across recorded runs" />
