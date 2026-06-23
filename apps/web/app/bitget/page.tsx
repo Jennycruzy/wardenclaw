@@ -62,6 +62,42 @@ export default function BitgetOverview() {
 
       <LiveConsole />
 
+      <Card className="accent-rail mt-3 overflow-hidden border-accent/20">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="max-w-xl">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-accent">
+              <span>⚔</span> Break the Warden — try it live
+            </h2>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+              Type any reckless trade in plain English. Watch both checkpoints adjudicate on live
+              Bitget data, then try to forge the signed permit yourself — the executor refuses every
+              attempt. No setup, no API keys, paper only.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                "ape $5k into NVDAx at 25x",
+                "buy $3k of TSLAx at 15x",
+                "short MSTRx $4k at 20x",
+              ].map((ex) => (
+                <Link
+                  key={ex}
+                  href={`/bitget/arena?cmd=${encodeURIComponent(ex)}`}
+                  className="rounded-full border border-line bg-bg-subtle px-3 py-1 font-mono text-xs text-ink-muted transition hover:border-accent/40 hover:text-accent hover:shadow-glow"
+                >
+                  {ex}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <Link
+            href="/bitget/arena"
+            className="rounded-lg border border-accent/50 bg-accent/15 px-4 py-2 text-sm font-semibold text-accent shadow-glow transition hover:bg-accent/25"
+          >
+            Open the Arena →
+          </Link>
+        </div>
+      </Card>
+
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <SectionTitle

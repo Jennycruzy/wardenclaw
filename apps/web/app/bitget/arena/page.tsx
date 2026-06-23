@@ -105,13 +105,15 @@ export default function ArenaPage() {
   const [error, setError] = useState<string | null>(null);
   const [evalResult, setEvalResult] = useState<Evaluation | null>(null);
   const [revealed, setRevealed] = useState(0); // gates revealed one-by-one
-  const [attackResult, setAttackResult] = useState<AttackResult | null>(null);
-  const [attackBusy, setAttackBusy] = useState<Attack | null>(null);
+  const [attackResults, setAttackResults] = useState<Partial<Record<Attack, AttackResult>>>({});
+  const [activeAttack, setActiveAttack] = useState<Attack | null>(null);
+  const [attackBusy, setAttackBusy] = useState<Attack | "all" | null>(null);
+  const attackResult = activeAttack ? attackResults[activeAttack] ?? null : null;
 
   const submit = useCallback(async (cmd: string) => {
     const c = cmd.trim();
     if (!c) return;
-    setLoading(true); setError(null); setAttackResult(null); setRevealed(0);
+    setLoading(true); setError(null); setAttackResults({}); setActiveAttack(null); setRevealed(0);
     try {
       const res = await fetch("/api/bitget/arena", {
         method: "POST",
@@ -121,12 +123,26 @@ export default function ArenaPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "evaluation failed");
       setEvalResult(data as Evaluation);
+      // Reflect the command in the URL so this adjudication is shareable.
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("cmd", c);
+        window.history.replaceState(null, "", url.toString());
+      }
     } catch (e) {
       setError((e as Error).message);
       setEvalResult(null);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Deep link: ?cmd=... auto-adjudicates on load, so a permalink replays a verdict.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const cmd = new URLSearchParams(window.location.search).get("cmd");
+    if (cmd) { setCommand(cmd); void submit(cmd); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reveal the gates one at a time once a result lands.
@@ -143,21 +159,45 @@ export default function ArenaPage() {
     return () => clearInterval(id);
   }, [evalResult]);
 
+  const fetchAttack = useCallback(async (attack: Attack, permit: Permit): Promise<AttackResult | null> => {
+    const res = await fetch("/api/bitget/arena", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "attack", attack, permit }),
+    });
+    const data = await res.json();
+    return res.ok ? (data as AttackResult) : null;
+  }, []);
+
   const runAttack = useCallback(async (attack: Attack) => {
     if (!evalResult?.permit) return;
     setAttackBusy(attack);
     try {
-      const res = await fetch("/api/bitget/arena", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "attack", attack, permit: evalResult.permit }),
-      });
-      const data = await res.json();
-      if (res.ok) setAttackResult(data as AttackResult);
+      const data = await fetchAttack(attack, evalResult.permit);
+      if (data) { setAttackResults((m) => ({ ...m, [attack]: data })); setActiveAttack(attack); }
     } finally {
       setAttackBusy(null);
     }
-  }, [evalResult]);
+  }, [evalResult, fetchAttack]);
+
+  // Fire every tamper attempt in sequence and keep them all on screen.
+  const runAllAttacks = useCallback(async () => {
+    if (!evalResult?.permit) return;
+    setAttackBusy("all");
+    try {
+      const collected: Partial<Record<Attack, AttackResult>> = {};
+      for (const a of ATTACKS) {
+        const data = await fetchAttack(a.key, evalResult.permit);
+        if (data) collected[a.key] = data;
+        setAttackResults({ ...collected });
+      }
+      // Lead the detail panel with the first attack that was refused, if any.
+      const firstRejected = ATTACKS.find((a) => collected[a.key] && !collected[a.key]!.validation.ok);
+      setActiveAttack(firstRejected?.key ?? "intact");
+    } finally {
+      setAttackBusy(null);
+    }
+  }, [evalResult, fetchAttack]);
 
   return (
     <Shell
@@ -343,23 +383,52 @@ export default function ArenaPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {ATTACKS.map((a) => (
-                      <button
-                        key={a.key}
-                        onClick={() => runAttack(a.key)}
-                        disabled={attackBusy !== null}
-                        title={a.blurb}
-                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40 ${
-                          a.key === "intact"
-                            ? "border-pos/40 bg-pos/10 text-pos hover:bg-pos/20"
-                            : "border-attack/40 bg-attack/10 text-attack hover:bg-attack/20"
-                        }`}
-                      >
-                        {attackBusy === a.key ? "…" : a.label}
-                      </button>
-                    ))}
+                  <div className="mb-3">
+                    <PermitJson permit={evalResult.permit} />
                   </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={runAllAttacks}
+                      disabled={attackBusy !== null}
+                      className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent shadow-glow transition hover:bg-accent/25 disabled:opacity-40"
+                    >
+                      {attackBusy === "all" ? "Running all…" : "⚔ Run all attacks"}
+                    </button>
+                    <span className="text-xs text-ink-faint">or fire one at a time:</span>
+                    {ATTACKS.map((a) => {
+                      const r = attackResults[a.key];
+                      const mark = r ? (r.validation.ok ? "✓" : "✕") : null;
+                      return (
+                        <button
+                          key={a.key}
+                          onClick={() => runAttack(a.key)}
+                          disabled={attackBusy !== null}
+                          title={a.blurb}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40 ${
+                            activeAttack === a.key ? "ring-1 ring-accent/60 " : ""
+                          }${
+                            a.key === "intact"
+                              ? "border-pos/40 bg-pos/10 text-pos hover:bg-pos/20"
+                              : "border-attack/40 bg-attack/10 text-attack hover:bg-attack/20"
+                          }`}
+                        >
+                          {attackBusy === a.key ? "…" : a.label}
+                          {mark ? (
+                            <span className={r!.validation.ok ? "text-pos" : "text-neg"}>{mark}</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {Object.keys(attackResults).length > 0 && (
+                    <AttackMatrix
+                      results={attackResults}
+                      active={activeAttack}
+                      onSelect={setActiveAttack}
+                    />
+                  )}
 
                   {attackResult && <AttackPanel result={attackResult} />}
                 </>
@@ -428,6 +497,100 @@ function AttackPanel({ result }: { result: AttackResult }) {
   );
 }
 
+// ---- Copyable signed permit -------------------------------------------------
+
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        void navigator.clipboard?.writeText(text);
+        setDone(true);
+        setTimeout(() => setDone(false), 1400);
+      }}
+      className="rounded border border-line bg-bg-subtle px-2 py-0.5 text-[11px] text-ink-muted transition hover:border-accent/40 hover:text-accent"
+    >
+      {done ? "Copied ✓" : label}
+    </button>
+  );
+}
+
+function PermitJson({ permit }: { permit: Permit }) {
+  const [open, setOpen] = useState(false);
+  const json = JSON.stringify(permit, null, 2);
+  return (
+    <div className="rounded-lg border border-line">
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted transition hover:text-ink"
+        >
+          <span className={`transition ${open ? "rotate-90" : ""}`}>▸</span>
+          {open ? "Hide" : "View"} the raw signed permit
+        </button>
+        <CopyButton text={json} label="Copy permit JSON" />
+      </div>
+      {open ? (
+        <pre className="max-h-72 overflow-auto border-t border-line/60 bg-black/50 p-3 font-mono text-[11px] leading-relaxed text-pos/80">
+          {json}
+        </pre>
+      ) : null}
+    </div>
+  );
+}
+
+// ---- Attack results matrix --------------------------------------------------
+
+function AttackMatrix({
+  results,
+  active,
+  onSelect,
+}: {
+  results: Partial<Record<Attack, AttackResult>>;
+  active: Attack | null;
+  onSelect: (a: Attack) => void;
+}) {
+  const done = ATTACKS.filter((a) => results[a.key]);
+  const rejected = done.filter((a) => !results[a.key]!.validation.ok).length;
+  return (
+    <div className="mt-4 rounded-lg border border-line p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Verifier scoreboard</p>
+        <span className="text-xs text-ink-muted">
+          <span className="text-neg">{rejected} refused</span> ·{" "}
+          <span className="text-pos">{done.length - rejected} accepted</span>
+        </span>
+      </div>
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        {ATTACKS.map((a) => {
+          const r = results[a.key];
+          const ok = r?.validation.ok;
+          return (
+            <button
+              key={a.key}
+              onClick={() => r && onSelect(a.key)}
+              disabled={!r}
+              className={`flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-left text-xs transition ${
+                active === a.key ? "border-accent/50 bg-accent/5" : "border-line"
+              } ${r ? "hover:border-accent/40" : "opacity-40"}`}
+            >
+              <span className="flex items-center gap-2">
+                <Dot tone={!r ? "neutral" : ok ? "pos" : "neg"} />
+                <span className="text-ink-muted">{a.label}</span>
+              </span>
+              {r ? (
+                <Badge tone={ok ? "pos" : "neg"}>{ok ? "accepted" : "refused"}</Badge>
+              ) : (
+                <span className="text-ink-faint">—</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ---- Finale — animated counterfactual ---------------------------------------
 
 /** Position equity at a price (mirrors ghostSim.equityAt; viz only). */
@@ -468,7 +631,8 @@ function FinalePanel({ finale }: { finale: Finale }) {
     }, 40);
   }, [n]);
 
-  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+  // Auto-play the counterfactual once when it first appears, then clean up.
+  useEffect(() => { play(); return () => { if (timer.current) clearInterval(timer.current); }; }, [play]);
 
   const W = 640, H = 180;
   const path = (series: number[]): string =>
