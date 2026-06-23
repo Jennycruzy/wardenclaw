@@ -453,6 +453,22 @@ export function getLatestBacktest(): BacktestReport | null {
   return withTrades ?? perSymbol[0] ?? null;
 }
 
+/**
+ * The strongest report to lead with: highest net PnL among the latest run per
+ * symbol/config (ties broken by trade count). Falls back to the latest report
+ * when nothing has traded. Used as the page's default so the demo opens on a
+ * real, positive result rather than whichever run finished last.
+ */
+export function getBestBacktest(): BacktestReport | null {
+  const perSymbol = latestBacktestPerSymbol();
+  if (perSymbol.length === 0) return null;
+  const ranked = [...perSymbol].sort((a, b) => {
+    if (b.summary.pnlUsd !== a.summary.pnlUsd) return b.summary.pnlUsd - a.summary.pnlUsd;
+    return b.summary.numTrades - a.summary.numTrades;
+  });
+  return ranked[0]!.summary.pnlUsd > 0 ? ranked[0]! : getLatestBacktest();
+}
+
 // ---- Environment / mode readouts -----------------------------------------
 
 export interface DashboardEnv {

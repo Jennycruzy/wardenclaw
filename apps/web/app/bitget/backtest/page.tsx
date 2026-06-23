@@ -2,8 +2,10 @@ import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { Card, EmptyState, Stat, SectionTitle, Badge } from "@/components/ui";
 import { EquityCurve } from "@/components/charts";
+import type { BacktestReport } from "@/lib/data";
 import {
   getLatestBacktest,
+  getBestBacktest,
   getBacktestBySource,
   latestBacktestPerSymbol,
   listBacktests,
@@ -13,11 +15,39 @@ import { XSTOCK_UNIVERSE } from "@wardenclaw/bitget-adapter";
 
 export const dynamic = "force-dynamic";
 
-/** Friendly display label for a backtest source like "bitget_public:TSLAONUSDT". */
-function symbolLabel(source: string): string {
-  const sym = source.split(":").pop() ?? source;
+interface SourceInfo {
+  /** Display ticker, e.g. "TSLAx". */
+  symbol: string;
+  /** Which gate produced it. */
+  group: "live" | "calibrated";
+  /** Short parameter caption for calibrated runs (empty for live). */
+  variant: string;
+}
+
+/**
+ * Parse a backtest source into a human-readable shape. Two forms exist on disk:
+ *   bitget_public:<BITGETSYM>                          → the live production gate
+ *   bitget_history:<TICKER>:calibrated_mag..tp..hold.. → a calibrated parameter run
+ */
+function describeSource(source: string): SourceInfo {
+  const parts = source.split(":");
+  if (parts[0] === "bitget_history" && parts[1]) {
+    const params = parts[2] ?? "";
+    const mag = /mag([\d.]+)/.exec(params)?.[1];
+    const tp = /tp([\d.]+)/.exec(params)?.[1];
+    const hold = /hold(\d+)/.exec(params)?.[1];
+    const vol = /vol([\d.]+)/.exec(params)?.[1];
+    const bits = [
+      mag ? `mag ${(Number(mag) * 100).toFixed(1)}%` : null,
+      vol ? `vol ${vol}×` : null,
+      tp ? `tp ${(Number(tp) * 100).toFixed(1)}%` : null,
+      hold ? `hold ${hold}` : null,
+    ].filter(Boolean);
+    return { symbol: parts[1], group: "calibrated", variant: bits.join(" · ") };
+  }
+  const sym = parts[parts.length - 1] ?? source;
   const match = XSTOCK_UNIVERSE.find((x) => x.bitgetSymbol.toLowerCase() === sym.toLowerCase());
-  return match?.display ?? sym;
+  return { symbol: match?.display ?? sym, group: "live", variant: "" };
 }
 
 export default function BacktestPage({
@@ -27,7 +57,8 @@ export default function BacktestPage({
 }) {
   const perSymbol = latestBacktestPerSymbol();
   const selected = searchParams?.symbol ? getBacktestBySource(searchParams.symbol) : null;
-  const report = selected ?? getLatestBacktest();
+  const best = getBestBacktest();
+  const report = selected ?? best ?? getLatestBacktest();
   const all = listBacktests();
 
   if (!report) {
@@ -44,11 +75,54 @@ export default function BacktestPage({
 
   const generatedAgeMs = Date.now() - Date.parse(report.generatedAt);
   const stale = !Number.isFinite(generatedAgeMs) || generatedAgeMs > 24 * 60 * 60 * 1000;
+  const info = describeSource(report.source);
+  const bestSource = best?.source ?? null;
+  const calibrated = perSymbol.filter((r) => describeSource(r.source).group === "calibrated");
+  const live = perSymbol.filter((r) => describeSource(r.source).group === "live");
+
+  const renderChip = (r: BacktestReport) => {
+    const active = r.source === report.source;
+    const isBest = r.source === bestSource;
+    const d = describeSource(r.source);
+    const pnl = r.summary.pnlUsd;
+    return (
+      <Link
+        key={r.source}
+        href={`/bitget/backtest?symbol=${encodeURIComponent(r.source)}`}
+        scroll={false}
+        title={d.variant || "live production gate"}
+        className={`group inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition ${
+          active
+            ? "border-accent/60 bg-accent/10 text-accent shadow-glow"
+            : "border-line bg-bg-subtle text-ink-muted hover:border-accent/30 hover:text-ink"
+        }`}
+      >
+        {isBest ? <span className="text-warn" title="Best run">★</span> : null}
+        <span className="font-semibold">{d.symbol}</span>
+        {d.variant ? (
+          <span className="hidden text-[10px] text-ink-faint sm:inline">{d.variant}</span>
+        ) : null}
+        <span
+          className={`tabular text-[10px] ${
+            r.summary.numTrades === 0
+              ? "text-ink-faint"
+              : pnl > 0
+                ? "text-pos"
+                : pnl < 0
+                  ? "text-neg"
+                  : "text-ink-muted"
+          }`}
+        >
+          {r.summary.numTrades === 0 ? "0t" : `${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(0)}`}
+        </span>
+      </Link>
+    );
+  };
 
   return (
     <Shell
       title="Backtest"
-      subtitle={`${symbolLabel(report.source)} · ${num(report.bars)} bars · ${shortTime(report.generatedAt)}`}
+      subtitle={`${info.symbol}${info.variant ? ` · ${info.variant}` : " · live gate"} · ${num(report.bars)} bars · ${shortTime(report.generatedAt)}`}
       actions={
         <Badge tone={stale ? "warn" : "pos"}>
           {stale ? "Real candles · stale report" : "Real Bitget candles · fresh"}
@@ -56,32 +130,23 @@ export default function BacktestPage({
       }
     >
       {perSymbol.length > 1 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          {perSymbol.map((r) => {
-            const active = r.source === report.source;
-            const traded = r.summary.numTrades > 0;
-            return (
-              <Link
-                key={r.source}
-                href={`/bitget/backtest?symbol=${encodeURIComponent(r.source)}`}
-                scroll={false}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition ${
-                  active
-                    ? "border-accent/50 bg-accent/10 text-accent shadow-glow"
-                    : "border-line bg-bg-subtle text-ink-muted hover:border-accent/30 hover:text-ink"
-                }`}
-              >
-                {symbolLabel(r.source)}
-                <span
-                  className={`tabular text-[10px] ${
-                    traded ? (active ? "text-accent" : "text-pos") : "text-ink-faint"
-                  }`}
-                >
-                  {r.summary.numTrades}t
-                </span>
-              </Link>
-            );
-          })}
+        <div className="mb-4 space-y-2">
+          {calibrated.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+                Calibrated runs
+              </span>
+              {calibrated.map(renderChip)}
+            </div>
+          ) : null}
+          {live.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+                Live gate
+              </span>
+              {live.map(renderChip)}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -178,8 +243,8 @@ export default function BacktestPage({
           )}
           {all.length > 1 ? (
             <p className="mt-4 border-t border-line/60 pt-3 text-xs text-ink-faint">
-              {perSymbol.length} symbols · {all.length} reports on disk · showing{" "}
-              {selected ? "the selected symbol" : "the latest symbol that traded"}.
+              {perSymbol.length} runs · {all.length} reports on disk · showing{" "}
+              {selected ? "the selected run" : "the best run by net PnL"}.
             </p>
           ) : null}
         </Card>
