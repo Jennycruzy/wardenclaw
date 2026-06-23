@@ -9,8 +9,7 @@ audit trail.
 > after-hours earnings/news/sentiment shocks faster than a human — but is
 > disciplined enough not to buy the first fake spike.
 
-This submission uses **Bitget-native data and tools only**. No CMC, no Trust
-Wallet, no BNB SDK, no BSC. Paper trading is the only simulation allowance in the
+This submission uses **Bitget-native data and tools only**. Paper trading is the only simulation allowance in the
 whole system, and it is **real paper trading on real Bitget prices** — never
 static mock data, and never presented as a real exchange fill.
 
