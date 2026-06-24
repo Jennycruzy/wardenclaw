@@ -89,8 +89,18 @@ export function candlesToBars(candles: BitgetCandle[], atrPeriod = 14): Bar[] {
  * continuation entry. It tracks shock state across bars via a closure, and
  * mirrors the live agent's exit policy: the backtester enforces the volatility
  * stop, while the profit target and max-hold time exit are signaled here.
+ *
+ * `bump` (optional) is called once for every flat bar that does NOT produce an
+ * entry candidate, with a code describing why — so the backtest report can show
+ * the real skip funnel (no-shock / cooldown / wrong-direction / low-volume)
+ * instead of only the economic gate rejections recorded by the core backtester.
+ * It is purely observational and never changes which bars trade.
  */
-export function reactorSignalFn(candles: BitgetCandle[], cfg: ReactorBacktestConfig): SignalFn {
+export function reactorSignalFn(
+  candles: BitgetCandle[],
+  cfg: ReactorBacktestConfig,
+  bump?: (code: string) => void,
+): SignalFn {
   let barsSinceShock: number | null = null;
   let armedMagnitudePct = 0;
   let pendingEntryPrice: number | null = null;
@@ -127,6 +137,21 @@ export function reactorSignalFn(candles: BitgetCandle[], cfg: ReactorBacktestCon
 
     // Wait out the cooldown; the spike bar itself is never entered.
     if (barsSinceShock === null || barsSinceShock < cfg.reactor.cooldownBars) {
+      if (bump) {
+        if (barsSinceShock !== null) {
+          // Armed on an earlier up-shock; just waiting out the cooldown window.
+          bump("SKIP_COOLDOWN");
+        } else if (shock.isShock && shock.direction === "down") {
+          // A qualifying shock fired, but downward — the reactor is long-only.
+          bump("SKIP_DOWN_SHOCK");
+        } else if (shock.magnitudePct >= cfg.reactor.shock.minMagnitudePct) {
+          // Move was big enough but the volume confirmation fell short.
+          bump("SKIP_LOW_VOLUME");
+        } else {
+          // The bulk of quiet bars: price move below the shock magnitude bar.
+          bump("SKIP_SUB_MAGNITUDE");
+        }
+      }
       return null;
     }
 
@@ -146,7 +171,14 @@ export function backtestReactor(
   cfg: ReactorBacktestConfig = DEFAULT_REACTOR_BACKTEST_CONFIG,
 ): BacktestResult {
   const bars = candlesToBars(candles);
-  return runBacktest(bars, reactorSignalFn(candles, cfg), {
+  // Skip codes recorded by the signal fn (no-shock/cooldown funnel) live
+  // alongside the economic gate rejections (REJECT_*) the core backtester
+  // records, so the report's `rejections` map shows the full skip funnel.
+  const skips: Record<string, number> = {};
+  const bumpSkip = (code: string) => {
+    skips[code] = (skips[code] ?? 0) + 1;
+  };
+  const result = runBacktest(bars, reactorSignalFn(candles, cfg, bumpSkip), {
     startingCapitalUsd: cfg.startingCapitalUsd,
     perTradeRiskPct: cfg.perTradeRiskPct,
     stopAtrMultiple: cfg.stopAtrMultiple,
@@ -159,4 +191,5 @@ export function backtestReactor(
     lpFeeBps: 0,
     safetyBufferBps: 0,
   });
+  return { ...result, rejections: { ...skips, ...result.rejections } };
 }
