@@ -72,8 +72,12 @@ function configFromSource(source: string): ReactorBacktestConfig {
   const params = source.split(":")[2] ?? "";
   const mag = Number(/mag([\d.]+)/.exec(params)?.[1] ?? DEFAULT_REACTOR_CONFIG.shock.minMagnitudePct);
   const vol = Number(/vol([\d.]+)/.exec(params)?.[1] ?? CALIBRATION_VOLUME_RATIO);
-  const tp = Number(/tp([\d.]+)/.exec(params)?.[1] ?? DEFAULT_REACTOR_CONFIG.takeProfitPct);
-  const hold = Number(/hold(\d+)/.exec(params)?.[1] ?? DEFAULT_REACTOR_CONFIG.maxHoldBars);
+  // `..._tp<x>_hold<y>` runs encode the exit policy in their name. `..._vol<x>`
+  // runs predate the take-profit/max-hold exit (commit 47307f5) and closed only
+  // on the volatility stop, so disable the signal exits to match that behaviour.
+  const tpMatch = /tp([\d.]+)/.exec(params);
+  const tp = tpMatch ? Number(tpMatch[1]) : Number.POSITIVE_INFINITY;
+  const hold = tpMatch ? Number(/hold(\d+)/.exec(params)?.[1] ?? DEFAULT_REACTOR_CONFIG.maxHoldBars) : Number.POSITIVE_INFINITY;
   return {
     ...DEFAULT_REACTOR_BACKTEST_CONFIG,
     reactor: {
