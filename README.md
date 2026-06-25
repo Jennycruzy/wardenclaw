@@ -32,15 +32,43 @@ Sim Executor (paper only) ── independently verifies the signed permit; no va
 Signed, hash-chained, replayable Warden Card  +  native terminal evidence
 ```
 
-- **Playbook Shield** — three strategy verdicts over five deterministic static checks
+- **Checkpoint 1 — Playbook Shield** (audits the STRATEGY, pre-flight): three strategy
+  verdicts (Certified / Restricted / Rejected) over five deterministic static checks
   (leverage, martingale, missing daily-drawdown cap, missing post-shock cooldown,
-  earnings/first-spike without confirmation). See `docs/PLAYBOOK_SHIELD.md`.
-- **Trade-Permit Engine** — six trade verdicts over ten deterministic gates, including
-  the asset-class-native **xStock premium/discount** gate and the BTC-correlation
-  HEDGE gate. See `docs/GATE_TABLE.md`.
+  earnings/first-spike without confirmation), plus a conditional overfit check. A
+  **Rejected** strategy emits no mandates at all; **Restricted** runs only under
+  tightened caps. The LLM never participates in this verdict. See `docs/PLAYBOOK_SHIELD.md`.
+- **Checkpoint 2 — Trade-Permit Engine** (audits each TRADE command, at execution time):
+  six trade verdicts (APPROVE / REDUCE / DELAY / HEDGE / BLOCK / CLOSE-ONLY) over ten
+  deterministic gates, including the asset-class-native **xStock premium/discount** gate
+  and the BTC-correlation HEDGE gate. See `docs/GATE_TABLE.md`.
 - **Warden Permit** — every non-BLOCK verdict produces a signed (HMAC-SHA256),
   single-use, expiring, price-drift-bound, hash-chained permit. The executor verifies
   it independently before any (paper) order.
+
+### What each verdict means (and what actually triggers it)
+
+The six are **trade** verdicts (Checkpoint 2). They are resolved in strict precedence —
+`CLOSE-ONLY > BLOCK > DELAY > HEDGE > REDUCE > APPROVE` — so the most protective
+applicable verdict wins. Full thresholds live in `docs/GATE_TABLE.md`.
+
+| Verdict | What actually triggers it | Effect on the order |
+|---|---|---|
+| **APPROVE** | Passes all required gates | Executes as requested |
+| **REDUCE** | Command too aggressive for current conditions — xStock premium > 1.5% (> 0.75% when the **US market is closed**), volatility > 80th pct, or liquidation distance < 8% | Engine **rewrites** the order (smaller size, lower leverage, market→limit) and permits *that* |
+| **DELAY** | Not rejected, just not now — spread > 50 bps, xStock premium > 3%, a news first-spike < 15 min old, or missing post-news confirmation | Returns a concrete recheck condition; no order yet |
+| **HEDGE** | Asset is in the BTC-correlated set **and** BTC realized vol is rising | Smaller primary leg **plus** an enforced protective `hedge_leg` (atomic two-leg bundle) |
+| **BLOCK** | A major gate fails — earnings window with leverage > 2×, liquidation distance < 4%, or any required feed older than 60s (fail-closed) | Nothing executes; **no permit is issued** |
+| **CLOSE-ONLY** | Account is in drawdown **survival mode** | Only reduce/close/cancel permitted; every exposure-increasing command is refused |
+
+> **Note on US market hours:** the market-session gate never blocks on its own — when the
+> US market is closed it only *tightens the xStock premium gate* (the 1.5% threshold drops
+> to 0.75%), which is what pushes borderline orders into **REDUCE** and then **DELAY** as the
+> premium widens. **HEDGE**, **BLOCK**, and **CLOSE-ONLY** are driven by other gates, not the clock.
+
+> **`REJECT` is different:** it is a Checkpoint 1 **strategy** verdict (Playbook Shield emits
+> Certified / Restricted / **Rejected**), not a trade verdict. A Rejected strategy emits **no
+> mandates at all**, so Checkpoint 2 never runs for it.
 
 ## Verified universe (live-reconciled)
 
@@ -85,13 +113,19 @@ it never substitutes synthetic candles.
     --env BITGET_SECRET_KEY=$BITGET_SECRET_KEY --env BITGET_PASSPHRASE=$BITGET_PASSPHRASE \
     bitget -- npx -y bitget-mcp-server
   ```
-- **WardenClaw MCP server** (the firewall itself) — register it so any agent must route
-  trade intent through it:
+- **WardenClaw MCP server** (the firewall itself) — register it so any Claude/Cursor
+  agent must route trade intent through both checkpoints before it can reach Bitget:
   ```
   claude mcp add -s user wardenclaw -- npx tsx scripts/warden-mcp-server.ts
   ```
-  Tools: `audit_strategy`, `request_permit`, `verify_permit`, `get_card`,
-  `replay_card`, `get_closeonly_status`, `run_ghost_sim`.
+  Seven stdio JSON-RPC tools, mapped to the two checkpoints:
+  - **Checkpoint 1:** `audit_strategy`
+  - **Checkpoint 2:** `request_permit`, `verify_permit`
+  - Permit lifecycle / evidence: `get_card`, `replay_card`, `get_closeonly_status`, `run_ghost_sim`.
+
+  The deterministic engine produces every verdict — the agent calling these tools never
+  gets to make a risk decision. Server logic lives in `packages/core/src/mcpServer.ts`
+  (pure, tested); the transport is a thin wrapper in `scripts/warden-mcp-server.ts`.
 
 ## What's implemented
 
