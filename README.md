@@ -7,6 +7,8 @@
 > **No valid Warden Permit = no execution.**
 > And one step earlier: **no unsafe strategy even produces mandates.**
 
+**🔗 Live judge dashboard: https://wardenclaw.duckdns.org/bitget**
+
 Everything is **paper / simulation only**. The LLM parses natural language and
 classifies news; **every risk verdict is deterministic**. The system is fail-closed:
 stale data, a tampered/expired/replayed permit, or an unknown asset → it refuses.
@@ -109,7 +111,8 @@ pnpm run:bitget-paper
 pnpm console:bitget
 pnpm backtest:bitget -- NVDAx
 pnpm backtest:all                         # refresh all five verified assets
-pnpm --filter @wardenclaw/web dev            # dashboard on http://localhost:3000
+pnpm --filter @wardenclaw/web dev            # local dashboard on http://localhost:3000
+                                             # live: https://wardenclaw.duckdns.org/bitget
 ```
 
 Production installs `ops/warden-backtests.{service,timer}` to refresh all five

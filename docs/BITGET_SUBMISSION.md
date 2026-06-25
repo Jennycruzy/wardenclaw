@@ -7,6 +7,8 @@ execution, and proves — cryptographically — why it acted.
 > **No valid Warden Permit = no execution.**
 > And one step earlier: **no unsafe strategy even produces mandates.**
 
+**🔗 Live judge dashboard: https://wardenclaw.duckdns.org/bitget**
+
 This submission uses **Bitget-native data and tools only**: the official **Agent Hub**,
 **Skill Hub** perception skills, and **two MCP servers** (Bitget's own + WardenClaw's).
 No CMC, no Trust Wallet, no BNB SDK, no BSC. Paper trading is the only simulation allowance
@@ -161,7 +163,7 @@ fail-loud Agent Hub; hash-chain integrity; and the backtest PnL/drawdown report.
 ## Judge dashboard (`apps/web`)
 
 A clean, modern read-only Next.js dashboard (App Router + Tailwind, dark theme, Recharts),
-fully responsive for phone viewing. Live at the deployed URL; locally on `/bitget`:
+fully responsive for phone viewing. Live at **https://wardenclaw.duckdns.org/bitget**; locally on `/bitget`:
 
 - `/bitget` — overview: execution mode, LLM/Agent-Hub status, xStock universe, paper-mandate
   stats, reject-code breakdown, recent mandates, live console bridge.
