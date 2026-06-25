@@ -11,6 +11,21 @@ Everything is **paper / simulation only**. The LLM parses natural language and
 classifies news; **every risk verdict is deterministic**. The system is fail-closed:
 stale data, a tampered/expired/replayed permit, or an unknown asset → it refuses.
 
+## The problem
+
+AI trading agents on Bitget xStocks can be prompted, mis-tuned, or hallucinate their
+way into account-destroying trades — over-leverage, martingale averaging-down, buying
+into an earnings spike, or chasing a tokenized stock trading at a wild premium to its
+underlying. Generic risk tooling misses the asset-class-specific traps (xStock
+premium/discount, US-market-hours, BTC correlation), and once a reckless command reaches
+the exchange it is already too late. **The agent is allowed to be the strategist; it
+should never be the last line of defense on risk.**
+
+WardenClaw inserts that missing line of defense: a deterministic command firewall
+between the agent and execution. An unsafe *strategy* never emits a single trade, and
+every individual *command* must earn a signed, verifiable permit before any (paper) order
+— so a compromised or careless agent cannot push risk it was never authorized to take.
+
 ## The two checkpoints
 
 ```

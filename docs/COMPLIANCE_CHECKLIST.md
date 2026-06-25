@@ -42,14 +42,14 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 | 8 | Structured logger (stdout + JSONL) | ✅ | `evidenceLog.ts` |
 | 8 | `evidence:run` transcript | ✅ | `scripts/evidence-run.ts` |
 | 8.b | Studio-parity paper records (NAV marks, round-trips, early win-rate/profit-factor) | 🟡 | current book persists and one exact historical settlement is recovered; three pre-persistence entries remain unresolved because no exit event exists |
-| 9 | UI: verdict badges, Playbook panel, original-vs-adjusted comparison, verification panel, fail-closed banner | 🟡 | engine-rendered examples exist, but the required editable strategy input and “Run in Mandate Mode” action are not implemented |
+| 9 | UI: verdict badges, Playbook panel, original-vs-adjusted comparison, verification panel, fail-closed banner | ✅ | `/bitget/arena` ("Break the Warden") takes a plain-English command and runs it through the real engine (both checkpoints + permit + adversary attacks + original-vs-adjusted finale) via `/api/bitget/arena`; `/bitget/firewall` renders the two-checkpoint decision. Verdict badges + fail-closed banner in `apps/web/components/firewall.tsx` |
 | 9 | UI extras: ghost-sim panel, scorecard summary view | ✅ | `/bitget/records` page (computed from real fixture candles + `output/scorecard.json`) |
 | 9 | UI extras: separated backtest/live-NAV/price charts with execution markers | ❌ | backtest equity curve exists; current live-NAV and real execution-marker charts are not implemented |
 | 9 | UI extras: Bitget asset logos | ⚠️ documented deviation | Bitget coins API exposes no logo URL and the image catalog is hotlink-protected (403, hashed filenames) — verified 2026-06-20; branded monogram retained with a `src` hook (`apps/web/components/asset-logo.tsx`). See `ARCHITECTURE_AUDIT.md §8.5` |
 | Perception | Live Bitget perception wired into the gate inputs | ✅ | `marketContext.ts`, `scripts/verify-perception.ts`; live `perception source: live_bitget_agent_hub_mcp` on the VPS |
 | Hardening | Transient 429 retry (REST + MCP), deterministic news fallback | ✅ | `retry.ts`, `mcpMarketData.ts`, `newsFeed.classifyNewsDeterministic`; see `ARCHITECTURE_AUDIT.md §8` |
 | Ops | Automated real-candle backtest refresh | ✅ | `scripts/refresh-bitget-backtests.ts`, `ops/warden-backtests.{service,timer}` |
-| 10 | Full test suite | ✅ | full core + adapter suites pass; exact count should be generated rather than maintained manually |
+| 10 | Full test suite | ✅ | 283 tests green (174 core + 109 adapter), verified 2026-06-25 |
 | 10 | Docs (README, GATE_TABLE, PLAYBOOK_SHIELD) | ✅ | `README.md`, `docs/GATE_TABLE.md`, `docs/PLAYBOOK_SHIELD.md` |
 | 10 | Demo kit + submission blurb + this checklist | ✅ | `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_BLURB.md`, this file |
 
@@ -65,6 +65,6 @@ perception are working. The remaining prompt-level gaps are material:
    enforce its state at permit issuance and execution.
 3. Rework the scorecard to calculate portfolio equity-curve maximum drawdown,
    include both HEDGE legs, and anchor event scenarios to recorded real events.
-4. Build the interactive Playbook Shield input/action and the missing live-NAV
-   and real execution-marker charts.
+4. Add the missing live-NAV and real execution-marker charts (the interactive
+   command input/action is now live at `/bitget/arena`).
 5. Bitget asset logos remain a documented external-catalog deviation.

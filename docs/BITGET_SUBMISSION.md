@@ -14,6 +14,18 @@ in the whole system, and it is **real paper trading on real Bitget prices** — 
 simulated against **real Bitget market data**, always labeled `internal_paper_engine` /
 `simulated: true`, never static mock data, and never presented as a real exchange fill.
 
+## The problem it solves
+
+AI trading agents on Bitget xStocks can be prompted, mis-tuned, or hallucinate their way
+into the trades that actually destroy tokenized-equity accounts: over-leverage, martingale
+averaging-down, entering into an earnings spike, or buying a tokenized stock trading at a
+large premium to its underlying. Generic risk tooling misses the asset-class-native traps
+(xStock premium/discount, US-market hours, BTC correlation), and once a reckless command
+reaches execution it is already too late. The agent can be the strategist — it must never
+be the last line of defense on risk. WardenClaw is that missing line of defense: a
+deterministic firewall between the agent and execution, so an unsafe strategy emits no
+trades and no individual command executes without a signed, independently verified permit.
+
 ## The two checkpoints
 
 ```
