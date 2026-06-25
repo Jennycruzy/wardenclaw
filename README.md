@@ -173,4 +173,4 @@ keys (deterministic sim mode). `WARDEN_SIGNING_KEY` signs permits (a labeled dev
 used when absent). Bitget keys enable live perception and the official Demo Trading
 executor; absent, everything runs from cached fixtures.
 
-More docs: `docs/{ARCHITECTURE_AUDIT,PLAYBOOK_SHIELD,GATE_TABLE,DEMO_SCRIPT,SUBMISSION_BLURB,COMPLIANCE_CHECKLIST,SETUP,SAFETY,LLM_POLICY}.md`.
+More docs: `docs/{ARCHITECTURE_AUDIT,PLAYBOOK_SHIELD,GATE_TABLE,DEMO_SCRIPT,BITGET_SUBMISSION,COMPLIANCE_CHECKLIST,SETUP,SAFETY,LLM_POLICY}.md`.

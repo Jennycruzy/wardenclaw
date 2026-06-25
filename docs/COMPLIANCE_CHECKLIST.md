@@ -51,7 +51,7 @@ Honest status of every build requirement, with file references. ✅ done · 🟡
 | Ops | Automated real-candle backtest refresh | ✅ | `scripts/refresh-bitget-backtests.ts`, `ops/warden-backtests.{service,timer}` |
 | 10 | Full test suite | ✅ | 283 tests green (174 core + 109 adapter), verified 2026-06-25 |
 | 10 | Docs (README, GATE_TABLE, PLAYBOOK_SHIELD) | ✅ | `README.md`, `docs/GATE_TABLE.md`, `docs/PLAYBOOK_SHIELD.md` |
-| 10 | Demo kit + submission blurb + this checklist | ✅ | `docs/DEMO_SCRIPT.md`, `docs/SUBMISSION_BLURB.md`, this file |
+| 10 | Demo kit + submission blurb + this checklist | ✅ | `docs/DEMO_SCRIPT.md`, `docs/BITGET_SUBMISSION.md`, this file |
 
 ## Outstanding work (honest)
 
